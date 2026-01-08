@@ -107,3 +107,27 @@ export interface PartySlot {
   character?: { id: string; name: string; image_url?: string; action_values?: ActionValues };
   vehicle?: { id: string; name: string };
 }
+
+export interface Campaign {
+  id: string;
+  name: string;
+  description?: string;
+  active: boolean;
+  gamemaster_id: string;
+  current_fight_id?: string;
+  image_url?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PaginationMeta {
+  current_page: number;
+  total_pages: number;
+  total_count: number;
+  per_page: number;
+}
+
+export interface CampaignListResponse {
+  campaigns: Campaign[];
+  meta: PaginationMeta;
+}

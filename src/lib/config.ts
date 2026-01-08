@@ -66,8 +66,12 @@ export function getCurrentCampaignId(): string | null {
   return loadConfig().currentCampaignId ?? null;
 }
 
-export function setCurrentCampaignId(campaignId: string): void {
+export function setCurrentCampaignId(campaignId: string | undefined): void {
   const config = loadConfig();
-  config.currentCampaignId = campaignId;
+  if (campaignId === undefined) {
+    delete config.currentCampaignId;
+  } else {
+    config.currentCampaignId = campaignId;
+  }
   saveConfig(config);
 }

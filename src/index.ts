@@ -2,6 +2,7 @@
 
 import { Command } from "commander";
 import { loginCommand, logoutCommand } from "./commands/login.js";
+import { registerCampaignCommands } from "./commands/campaign.js";
 import { registerCharacterCommands } from "./commands/character.js";
 import { registerConfigCommands } from "./commands/config.js";
 import { registerFactionCommands } from "./commands/faction.js";
@@ -25,6 +26,9 @@ program
   .command("logout")
   .description("Clear saved authentication")
   .action(logoutCommand);
+
+// Campaign commands
+registerCampaignCommands(program);
 
 // Character commands
 registerCharacterCommands(program);
