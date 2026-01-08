@@ -1,4 +1,7 @@
 import axios, { AxiosInstance, AxiosError } from "axios";
+import FormData from "form-data";
+import * as fs from "fs";
+import * as path from "path";
 import { getApiUrl, getToken } from "./config.js";
 import type {
   User,
@@ -120,31 +123,61 @@ export async function createCharacter(
   }
 }
 
+export interface CreateCharacterRawOptions {
+  campaignId?: string;
+  imagePath?: string;
+}
+
 /**
  * Create a character from raw JSON.
  * Passes the JSON directly to the API - useful for Claude-generated payloads.
+ * Optionally uploads an image file if imagePath is provided.
  */
 export async function createCharacterRaw(
   characterData: Record<string, unknown>,
-  campaignId?: string
+  options: CreateCharacterRawOptions = {}
 ): Promise<Character> {
   const token = getToken();
   if (!token) {
     throw new Error("Not authenticated. Run 'chiwar login' first.");
   }
 
-  const client = createClient(token);
-
   // Add campaign_id if provided
   const payload = { ...characterData };
-  if (campaignId) {
-    payload.campaign_id = campaignId;
+  if (options.campaignId) {
+    payload.campaign_id = options.campaignId;
   }
 
   try {
-    const response = await client.post("/api/v2/characters", {
-      character: payload,
-    });
+    let response;
+
+    if (options.imagePath) {
+      // Verify the file exists
+      if (!fs.existsSync(options.imagePath)) {
+        throw new Error(`Image file not found: ${options.imagePath}`);
+      }
+
+      // Use multipart form data for image upload
+      const formData = new FormData();
+      formData.append("character", JSON.stringify(payload));
+      formData.append("image", fs.createReadStream(options.imagePath), {
+        filename: path.basename(options.imagePath),
+      });
+
+      response = await axios.post(`${getApiUrl()}/api/v2/characters`, formData, {
+        headers: {
+          ...formData.getHeaders(),
+          Authorization: `Bearer ${token}`,
+        },
+      });
+    } else {
+      // Standard JSON request
+      const client = createClient(token);
+      response = await client.post("/api/v2/characters", {
+        character: payload,
+      });
+    }
+
     return response.data;
   } catch (error) {
     if (error instanceof AxiosError && error.response) {
@@ -161,25 +194,55 @@ export async function createCharacterRaw(
   }
 }
 
+export interface UpdateCharacterRawOptions {
+  imagePath?: string;
+}
+
 /**
  * Update a character from raw JSON.
  * Passes the JSON directly to the API - useful for Claude-generated payloads.
+ * Optionally uploads an image file if imagePath is provided.
  */
 export async function updateCharacterRaw(
   characterId: string,
-  characterData: Record<string, unknown>
+  characterData: Record<string, unknown>,
+  options: UpdateCharacterRawOptions = {}
 ): Promise<Character> {
   const token = getToken();
   if (!token) {
     throw new Error("Not authenticated. Run 'chiwar login' first.");
   }
 
-  const client = createClient(token);
-
   try {
-    const response = await client.patch(`/api/v2/characters/${characterId}`, {
-      character: characterData,
-    });
+    let response;
+
+    if (options.imagePath) {
+      // Verify the file exists
+      if (!fs.existsSync(options.imagePath)) {
+        throw new Error(`Image file not found: ${options.imagePath}`);
+      }
+
+      // Use multipart form data for image upload
+      const formData = new FormData();
+      formData.append("character", JSON.stringify(characterData));
+      formData.append("image", fs.createReadStream(options.imagePath), {
+        filename: path.basename(options.imagePath),
+      });
+
+      response = await axios.patch(`${getApiUrl()}/api/v2/characters/${characterId}`, formData, {
+        headers: {
+          ...formData.getHeaders(),
+          Authorization: `Bearer ${token}`,
+        },
+      });
+    } else {
+      // Standard JSON request
+      const client = createClient(token);
+      response = await client.patch(`/api/v2/characters/${characterId}`, {
+        character: characterData,
+      });
+    }
+
     return response.data;
   } catch (error) {
     if (error instanceof AxiosError && error.response) {
