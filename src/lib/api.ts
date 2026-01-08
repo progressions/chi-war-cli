@@ -8,6 +8,9 @@ import type {
   Character,
   CreateCharacterParams,
   Party,
+  Campaign,
+  CampaignListResponse,
+  PaginationMeta,
 } from "../types/index.js";
 
 export interface ApiError {
@@ -259,9 +262,44 @@ export async function updateCharacterRaw(
   }
 }
 
-export async function listCampaigns(): Promise<
-  Array<{ id: string; name: string }>
-> {
+// =============================================================================
+// Campaign API
+// =============================================================================
+
+export interface ListCampaignsOptions {
+  limit?: number;
+  page?: number;
+}
+
+export async function listCampaigns(
+  options: ListCampaignsOptions = {}
+): Promise<CampaignListResponse> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  const params = new URLSearchParams();
+  if (options.limit) params.append("per_page", options.limit.toString());
+  if (options.page) params.append("page", options.page.toString());
+
+  try {
+    const response = await client.get(`/api/v2/campaigns?${params.toString()}`);
+    return {
+      campaigns: response.data.campaigns || [],
+      meta: response.data.meta || { current_page: 1, total_pages: 1, total_count: 0, per_page: 25 },
+    };
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      throw new Error("Failed to list campaigns");
+    }
+    throw error;
+  }
+}
+
+export async function getCampaign(campaignId: string): Promise<Campaign> {
   const token = getToken();
   if (!token) {
     throw new Error("Not authenticated. Run 'chiwar login' first.");
@@ -270,11 +308,118 @@ export async function listCampaigns(): Promise<
   const client = createClient(token);
 
   try {
-    const response = await client.get("/api/v2/campaigns");
-    return response.data.campaigns || response.data;
+    const response = await client.get(`/api/v2/campaigns/${campaignId}`);
+    return response.data;
   } catch (error) {
     if (error instanceof AxiosError && error.response) {
-      throw new Error("Failed to list campaigns");
+      if (error.response.status === 404) {
+        throw new Error(`Campaign not found: ${campaignId}`);
+      }
+      throw new Error("Failed to get campaign");
+    }
+    throw error;
+  }
+}
+
+export async function createCampaign(
+  campaignData: Record<string, unknown>
+): Promise<Campaign> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.post("/api/v2/campaigns", {
+      campaign: campaignData,
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      const data = error.response.data as ApiError;
+      if (data.errors) {
+        const messages = Object.entries(data.errors)
+          .map(([field, errs]) => `${field}: ${errs.join(", ")}`)
+          .join("; ");
+        throw new Error(`Failed to create campaign: ${messages}`);
+      }
+      throw new Error(data.message || "Failed to create campaign");
+    }
+    throw error;
+  }
+}
+
+export async function updateCampaign(
+  campaignId: string,
+  campaignData: Record<string, unknown>
+): Promise<Campaign> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.patch(`/api/v2/campaigns/${campaignId}`, {
+      campaign: campaignData,
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      const data = error.response.data as ApiError;
+      if (data.errors) {
+        const messages = Object.entries(data.errors)
+          .map(([field, errs]) => `${field}: ${errs.join(", ")}`)
+          .join("; ");
+        throw new Error(`Failed to update campaign: ${messages}`);
+      }
+      throw new Error(data.message || "Failed to update campaign");
+    }
+    throw error;
+  }
+}
+
+export async function deleteCampaign(campaignId: string): Promise<void> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    await client.delete(`/api/v2/campaigns/${campaignId}`);
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error(`Campaign not found: ${campaignId}`);
+      }
+      throw new Error("Failed to delete campaign");
+    }
+    throw error;
+  }
+}
+
+export async function setCurrentCampaign(campaignId: string): Promise<Campaign> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.patch(`/api/v2/campaigns/${campaignId}/set`);
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error(`Campaign not found: ${campaignId}`);
+      }
+      throw new Error("Failed to set current campaign");
     }
     throw error;
   }

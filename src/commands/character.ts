@@ -50,7 +50,8 @@ export function registerCharacterCommands(program: Command): void {
 
         if (!campaignId) {
           info("No campaign selected. Fetching your campaigns...");
-          const campaigns = await listCampaigns();
+          const result = await listCampaigns();
+          const campaigns = result.campaigns;
 
           if (campaigns.length === 0) {
             error("No campaigns found. Create a campaign first at chiwar.net");
