@@ -4,6 +4,7 @@ import type {
   User,
   Character,
   CreateCharacterParams,
+  Party,
 } from "../types/index.js";
 
 export interface ApiError {
@@ -388,6 +389,157 @@ export async function getCharacter(characterId: string): Promise<Character> {
         throw new Error(`Character not found: ${characterId}`);
       }
       throw new Error("Failed to get character");
+    }
+    throw error;
+  }
+}
+
+// =============================================================================
+// Party API
+// =============================================================================
+
+export interface ListPartiesOptions {
+  limit?: number;
+  page?: number;
+}
+
+export interface ListPartiesResponse {
+  parties: Party[];
+  meta: {
+    current_page: number;
+    total_pages: number;
+    total_count: number;
+    per_page: number;
+  };
+}
+
+export async function listParties(
+  options: ListPartiesOptions = {}
+): Promise<ListPartiesResponse> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  const params = new URLSearchParams();
+  if (options.limit) params.append("per_page", options.limit.toString());
+  if (options.page) params.append("page", options.page.toString());
+
+  try {
+    const response = await client.get(`/api/v2/parties?${params.toString()}`);
+    return {
+      parties: response.data.parties || [],
+      meta: response.data.meta || { current_page: 1, total_pages: 1, total_count: 0, per_page: 25 },
+    };
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      throw new Error("Failed to list parties");
+    }
+    throw error;
+  }
+}
+
+export async function getParty(partyId: string): Promise<Party> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.get(`/api/v2/parties/${partyId}`);
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error(`Party not found: ${partyId}`);
+      }
+      throw new Error("Failed to get party");
+    }
+    throw error;
+  }
+}
+
+export async function createParty(
+  partyData: Record<string, unknown>
+): Promise<Party> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.post("/api/v2/parties", {
+      party: partyData,
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      const data = error.response.data as ApiError;
+      if (data.errors) {
+        const messages = Object.entries(data.errors)
+          .map(([field, errs]) => `${field}: ${errs.join(", ")}`)
+          .join("; ");
+        throw new Error(`Failed to create party: ${messages}`);
+      }
+      throw new Error(data.message || "Failed to create party");
+    }
+    throw error;
+  }
+}
+
+export async function updateParty(
+  partyId: string,
+  partyData: Record<string, unknown>
+): Promise<Party> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.patch(`/api/v2/parties/${partyId}`, {
+      party: partyData,
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      const data = error.response.data as ApiError;
+      if (data.errors) {
+        const messages = Object.entries(data.errors)
+          .map(([field, errs]) => `${field}: ${errs.join(", ")}`)
+          .join("; ");
+        throw new Error(`Failed to update party: ${messages}`);
+      }
+      throw new Error(data.message || "Failed to update party");
+    }
+    throw error;
+  }
+}
+
+export async function deleteParty(partyId: string): Promise<void> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    await client.delete(`/api/v2/parties/${partyId}`);
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error(`Party not found: ${partyId}`);
+      }
+      throw new Error("Failed to delete party");
     }
     throw error;
   }

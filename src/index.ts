@@ -5,6 +5,7 @@ import { loginCommand, logoutCommand } from "./commands/login.js";
 import { registerCharacterCommands } from "./commands/character.js";
 import { registerConfigCommands } from "./commands/config.js";
 import { registerFactionCommands } from "./commands/faction.js";
+import { registerPartyCommands } from "./commands/party.js";
 
 const program = new Command();
 
@@ -33,6 +34,9 @@ registerConfigCommands(program);
 
 // Faction commands
 registerFactionCommands(program);
+
+// Party commands
+registerPartyCommands(program);
 
 // Parse and execute
 program.parse();

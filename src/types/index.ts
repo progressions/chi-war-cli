@@ -75,3 +75,35 @@ export interface CreateCharacterParams {
   fortune?: number;
   description?: string;
 }
+
+export interface Party {
+  id: string;
+  name: string;
+  description?: string;
+  active: boolean;
+  faction_id?: string;
+  campaign_id: string;
+  juncture_id?: string;
+  character_ids: string[];
+  vehicle_ids: string[];
+  created_at: string;
+  updated_at: string;
+  image_url?: string;
+  characters?: Array<{ id: string; name: string; image_url?: string }>;
+  vehicles?: Array<{ id: string; name: string }>;
+  faction?: { id: string; name: string };
+  juncture?: { id: string; name: string };
+  slots?: PartySlot[];
+  has_composition?: boolean;
+}
+
+export interface PartySlot {
+  id: string;
+  role: string;
+  character_id?: string;
+  vehicle_id?: string;
+  default_mook_count?: number;
+  position?: number;
+  character?: { id: string; name: string; image_url?: string; action_values?: ActionValues };
+  vehicle?: { id: string; name: string };
+}
