@@ -18,6 +18,7 @@ export function registerCharacterCommands(program: Command): void {
     .option("-f, --file <path>", "Read character JSON from file")
     .option("-c, --campaign <id>", "Campaign ID (uses current if not specified)")
     .option("--faction <name>", "Assign to faction (by name, fuzzy match)")
+    .option("-i, --image <path>", "Attach image file to character")
     .action(async (jsonArg, options) => {
       try {
         // Get JSON from argument or file
@@ -35,6 +36,7 @@ export function registerCharacterCommands(program: Command): void {
           console.log("\nUsage:");
           console.log('  chiwar character create \'{"name": "...", "action_values": {...}}\'');
           console.log("  chiwar character create --file character.json");
+          console.log("  chiwar character create --file character.json --image ./avatar.png");
           console.log("\nExample:");
           console.log(`  chiwar character create '${JSON.stringify({
             name: "Triad Thug",
@@ -88,8 +90,11 @@ export function registerCharacterCommands(program: Command): void {
           info(`Faction: ${faction.name}`);
         }
 
-        // Create the character
-        const created = await createCharacterRaw(characterJson, campaignId);
+        // Create the character with optional image
+        const created = await createCharacterRaw(characterJson, {
+          campaignId,
+          imagePath: options.image,
+        });
 
         success(`Created character: ${created.name}`);
         console.log(`  ID: ${created.id}`);
@@ -101,6 +106,9 @@ export function registerCharacterCommands(program: Command): void {
           if (av.Defense) console.log(`  Defense: ${av.Defense}`);
           if (av.Toughness) console.log(`  Toughness: ${av.Toughness}`);
           if (av.Speed) console.log(`  Speed: ${av.Speed}`);
+        }
+        if (options.image) {
+          console.log(`  Image: uploaded`);
         }
       } catch (err) {
         if (err instanceof SyntaxError) {
@@ -118,9 +126,10 @@ export function registerCharacterCommands(program: Command): void {
     .argument("<id>", "Character ID to update")
     .argument("[json]", "Character JSON (inline)")
     .option("-f, --file <path>", "Read character JSON from file")
+    .option("-i, --image <path>", "Attach or replace image file")
     .action(async (id, jsonArg, options) => {
       try {
-        // Get JSON from argument or file
+        // Get JSON from argument, file, or use empty object for image-only updates
         let characterJson: Record<string, unknown>;
 
         if (options.file) {
@@ -130,16 +139,23 @@ export function registerCharacterCommands(program: Command): void {
         } else if (jsonArg) {
           // Parse inline JSON
           characterJson = JSON.parse(jsonArg);
+        } else if (options.image) {
+          // Allow image-only updates with no JSON
+          characterJson = {};
         } else {
-          error("Provide character JSON as argument or use --file");
+          error("Provide character JSON as argument, use --file, or use --image");
           console.log("\nUsage:");
           console.log('  chiwar character update <id> \'{"name": "...", "action_values": {...}}\'');
           console.log("  chiwar character update <id> --file character.json");
+          console.log("  chiwar character update <id> --image ./new-avatar.png");
+          console.log("  chiwar character update <id> --file character.json --image ./avatar.png");
           process.exit(1);
         }
 
-        // Update the character
-        const updated = await updateCharacterRaw(id, characterJson);
+        // Update the character with optional image
+        const updated = await updateCharacterRaw(id, characterJson, {
+          imagePath: options.image,
+        });
 
         success(`Updated character: ${updated.name}`);
         console.log(`  ID: ${updated.id}`);
@@ -151,6 +167,9 @@ export function registerCharacterCommands(program: Command): void {
           if (av.Defense) console.log(`  Defense: ${av.Defense}`);
           if (av.Toughness) console.log(`  Toughness: ${av.Toughness}`);
           if (av.Speed) console.log(`  Speed: ${av.Speed}`);
+        }
+        if (options.image) {
+          console.log(`  Image: uploaded`);
         }
       } catch (err) {
         if (err instanceof SyntaxError) {
