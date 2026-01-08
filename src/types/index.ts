@@ -170,3 +170,36 @@ export interface FightListResponse {
   fights: Fight[];
   meta: PaginationMeta;
 }
+
+export interface SiteAttunement {
+  id: string;
+  character_id: string;
+  site_id: string;
+  character?: {
+    id: string;
+    name: string;
+    image_url?: string;
+  };
+}
+
+export interface Site {
+  id: string;
+  name: string;
+  description?: string;
+  active: boolean;
+  feng_shui_value?: number;
+  campaign_id: string;
+  juncture_id?: string;
+  faction_id?: string;
+  image_url?: string;
+  created_at: string;
+  updated_at: string;
+  juncture?: { id: string; name: string };
+  faction?: { id: string; name: string };
+  attunements?: SiteAttunement[];
+}
+
+export interface SiteListResponse {
+  sites: Site[];
+  meta: PaginationMeta;
+}
