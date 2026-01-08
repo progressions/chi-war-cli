@@ -119,6 +119,82 @@ export async function createCharacter(
   }
 }
 
+/**
+ * Create a character from raw JSON.
+ * Passes the JSON directly to the API - useful for Claude-generated payloads.
+ */
+export async function createCharacterRaw(
+  characterData: Record<string, unknown>,
+  campaignId?: string
+): Promise<Character> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  // Add campaign_id if provided
+  const payload = { ...characterData };
+  if (campaignId) {
+    payload.campaign_id = campaignId;
+  }
+
+  try {
+    const response = await client.post("/api/v2/characters", {
+      character: payload,
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      const data = error.response.data as ApiError;
+      if (data.errors) {
+        const messages = Object.entries(data.errors)
+          .map(([field, errs]) => `${field}: ${errs.join(", ")}`)
+          .join("; ");
+        throw new Error(`Failed to create character: ${messages}`);
+      }
+      throw new Error(data.message || "Failed to create character");
+    }
+    throw error;
+  }
+}
+
+/**
+ * Update a character from raw JSON.
+ * Passes the JSON directly to the API - useful for Claude-generated payloads.
+ */
+export async function updateCharacterRaw(
+  characterId: string,
+  characterData: Record<string, unknown>
+): Promise<Character> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.patch(`/api/v2/characters/${characterId}`, {
+      character: characterData,
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      const data = error.response.data as ApiError;
+      if (data.errors) {
+        const messages = Object.entries(data.errors)
+          .map(([field, errs]) => `${field}: ${errs.join(", ")}`)
+          .join("; ");
+        throw new Error(`Failed to update character: ${messages}`);
+      }
+      throw new Error(data.message || "Failed to update character");
+    }
+    throw error;
+  }
+}
+
 export async function listCampaigns(): Promise<
   Array<{ id: string; name: string }>
 > {
@@ -135,6 +211,112 @@ export async function listCampaigns(): Promise<
   } catch (error) {
     if (error instanceof AxiosError && error.response) {
       throw new Error("Failed to list campaigns");
+    }
+    throw error;
+  }
+}
+
+export interface Faction {
+  id: string;
+  name: string;
+  description?: string;
+  campaign_id: string;
+}
+
+export async function listFactions(): Promise<Faction[]> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    // Fetch all pages of factions
+    const allFactions: Faction[] = [];
+    let page = 1;
+    let hasMore = true;
+
+    while (hasMore) {
+      const response = await client.get(`/api/v2/factions?page=${page}&per_page=100`);
+      const factions = response.data.factions || [];
+      allFactions.push(...factions);
+
+      const meta = response.data.meta;
+      hasMore = meta && page < meta.total_pages;
+      page++;
+    }
+
+    return allFactions;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      throw new Error("Failed to list factions");
+    }
+    throw error;
+  }
+}
+
+export async function searchFaction(query: string): Promise<Faction | null> {
+  const factions = await listFactions();
+  const lowerQuery = query.toLowerCase();
+
+  // Try exact match first
+  let match = factions.find(f => f.name.toLowerCase() === lowerQuery);
+  if (match) return match;
+
+  // Try starts-with match
+  match = factions.find(f => f.name.toLowerCase().startsWith(lowerQuery));
+  if (match) return match;
+
+  // Try contains match
+  match = factions.find(f => f.name.toLowerCase().includes(lowerQuery));
+  return match || null;
+}
+
+// CLI Browser Auth Flow
+
+export interface CliAuthStartResponse {
+  code: string;
+  url: string;
+  expires_in: number;
+}
+
+export interface CliAuthPollResponse {
+  status: "pending" | "approved" | "expired";
+  expires_in?: number;
+  token?: string;
+  user?: User;
+  error?: string;
+}
+
+export async function startCliAuth(): Promise<CliAuthStartResponse> {
+  const client = createClient();
+
+  try {
+    const response = await client.post("/api/v2/cli/auth/start");
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      const data = error.response.data as ApiError;
+      throw new Error(data.message || "Failed to start authentication");
+    }
+    throw error;
+  }
+}
+
+export async function pollCliAuth(code: string): Promise<CliAuthPollResponse> {
+  const client = createClient();
+
+  try {
+    const response = await client.post("/api/v2/cli/auth/poll", { code });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 410) {
+        return { status: "expired", error: "Authorization code expired" };
+      }
+      const data = error.response.data as ApiError;
+      throw new Error(data.message || "Failed to poll authentication status");
     }
     throw error;
   }

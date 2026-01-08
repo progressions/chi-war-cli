@@ -56,6 +56,12 @@ export function getApiUrl(): string {
   return loadConfig().apiUrl;
 }
 
+export function setApiUrl(url: string): void {
+  const config = loadConfig();
+  config.apiUrl = url;
+  saveConfig(config);
+}
+
 export function getCurrentCampaignId(): string | null {
   return loadConfig().currentCampaignId ?? null;
 }
