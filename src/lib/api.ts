@@ -11,6 +11,8 @@ import type {
   Campaign,
   CampaignListResponse,
   PaginationMeta,
+  Fight,
+  FightListResponse,
 } from "../types/index.js";
 
 export interface ApiError {
@@ -863,6 +865,193 @@ export async function clearSlot(
         throw new Error("Party or slot not found");
       }
       throw new Error("Failed to clear slot");
+    }
+    throw error;
+  }
+}
+
+// =============================================================================
+// Fight API
+// =============================================================================
+
+export interface ListFightsOptions {
+  limit?: number;
+  page?: number;
+  active?: boolean;
+}
+
+export async function listFights(
+  options: ListFightsOptions = {}
+): Promise<FightListResponse> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  const params = new URLSearchParams();
+  if (options.limit) params.append("per_page", options.limit.toString());
+  if (options.page) params.append("page", options.page.toString());
+  if (options.active !== undefined) params.append("active", options.active.toString());
+
+  try {
+    const response = await client.get(`/api/v2/fights?${params.toString()}`);
+    return {
+      fights: response.data.fights || [],
+      meta: response.data.meta || { current_page: 1, total_pages: 1, total_count: 0, per_page: 25 },
+    };
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      throw new Error("Failed to list fights");
+    }
+    throw error;
+  }
+}
+
+export async function getFight(fightId: string): Promise<Fight> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.get(`/api/v2/fights/${fightId}`);
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error(`Fight not found: ${fightId}`);
+      }
+      throw new Error("Failed to get fight");
+    }
+    throw error;
+  }
+}
+
+export async function createFight(
+  fightData: Record<string, unknown>
+): Promise<Fight> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.post("/api/v2/fights", {
+      fight: fightData,
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      const data = error.response.data as ApiError;
+      if (data.errors) {
+        const messages = Object.entries(data.errors)
+          .map(([field, errs]) => `${field}: ${errs.join(", ")}`)
+          .join("; ");
+        throw new Error(`Failed to create fight: ${messages}`);
+      }
+      throw new Error(data.message || "Failed to create fight");
+    }
+    throw error;
+  }
+}
+
+export async function updateFight(
+  fightId: string,
+  fightData: Record<string, unknown>
+): Promise<Fight> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.patch(`/api/v2/fights/${fightId}`, {
+      fight: fightData,
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      const data = error.response.data as ApiError;
+      if (data.errors) {
+        const messages = Object.entries(data.errors)
+          .map(([field, errs]) => `${field}: ${errs.join(", ")}`)
+          .join("; ");
+        throw new Error(`Failed to update fight: ${messages}`);
+      }
+      throw new Error(data.message || "Failed to update fight");
+    }
+    throw error;
+  }
+}
+
+export async function deleteFight(fightId: string): Promise<void> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    await client.delete(`/api/v2/fights/${fightId}`);
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error(`Fight not found: ${fightId}`);
+      }
+      throw new Error("Failed to delete fight");
+    }
+    throw error;
+  }
+}
+
+export async function endFight(fightId: string): Promise<Fight> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.patch(`/api/v2/fights/${fightId}/end_fight`);
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error(`Fight not found: ${fightId}`);
+      }
+      throw new Error("Failed to end fight");
+    }
+    throw error;
+  }
+}
+
+export async function resetFight(fightId: string): Promise<Fight> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.patch(`/api/v2/fights/${fightId}/reset`);
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error(`Fight not found: ${fightId}`);
+      }
+      throw new Error("Failed to reset fight");
     }
     throw error;
   }
