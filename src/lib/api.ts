@@ -321,3 +321,74 @@ export async function pollCliAuth(code: string): Promise<CliAuthPollResponse> {
     throw error;
   }
 }
+
+export interface ListCharactersOptions {
+  campaignId?: string;
+  limit?: number;
+  page?: number;
+  sort?: string;
+  direction?: "asc" | "desc";
+}
+
+export interface ListCharactersResponse {
+  characters: Character[];
+  meta: {
+    current_page: number;
+    total_pages: number;
+    total_count: number;
+    per_page: number;
+  };
+}
+
+export async function listCharacters(
+  options: ListCharactersOptions = {}
+): Promise<ListCharactersResponse> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  const params = new URLSearchParams();
+  if (options.campaignId) params.append("campaign_id", options.campaignId);
+  if (options.limit) params.append("per_page", options.limit.toString());
+  if (options.page) params.append("page", options.page.toString());
+  if (options.sort) params.append("sort", options.sort);
+  if (options.direction) params.append("direction", options.direction);
+
+  try {
+    const response = await client.get(`/api/v2/characters?${params.toString()}`);
+    return {
+      characters: response.data.characters || [],
+      meta: response.data.meta || { current_page: 1, total_pages: 1, total_count: 0, per_page: 25 },
+    };
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      throw new Error("Failed to list characters");
+    }
+    throw error;
+  }
+}
+
+export async function getCharacter(characterId: string): Promise<Character> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.get(`/api/v2/characters/${characterId}`);
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error(`Character not found: ${characterId}`);
+      }
+      throw new Error("Failed to get character");
+    }
+    throw error;
+  }
+}
