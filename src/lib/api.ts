@@ -544,3 +544,118 @@ export async function deleteParty(partyId: string): Promise<void> {
     throw error;
   }
 }
+
+export interface PartyTemplateSlot {
+  role: string;
+  label: string;
+  default_mook_count?: number;
+}
+
+export interface PartyTemplate {
+  key: string;
+  name: string;
+  description: string;
+  slots: PartyTemplateSlot[];
+}
+
+export async function listPartyTemplates(): Promise<PartyTemplate[]> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.get("/api/v2/parties/templates");
+    return response.data.templates || [];
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      throw new Error("Failed to list party templates");
+    }
+    throw error;
+  }
+}
+
+export async function applyPartyTemplate(
+  partyId: string,
+  templateKey: string
+): Promise<Party> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.post(`/api/v2/parties/${partyId}/apply_template`, {
+      template_key: templateKey,
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error("Party or template not found");
+      }
+      throw new Error("Failed to apply template");
+    }
+    throw error;
+  }
+}
+
+export async function assignCharacterToSlot(
+  partyId: string,
+  slotId: string,
+  characterId: string
+): Promise<Party> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.patch(`/api/v2/parties/${partyId}/slots/${slotId}`, {
+      character_id: characterId,
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error("Party or slot not found");
+      }
+      throw new Error("Failed to assign character to slot");
+    }
+    throw error;
+  }
+}
+
+export async function clearSlot(
+  partyId: string,
+  slotId: string
+): Promise<Party> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.patch(`/api/v2/parties/${partyId}/slots/${slotId}`, {
+      character_id: null,
+      vehicle_id: null,
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error("Party or slot not found");
+      }
+      throw new Error("Failed to clear slot");
+    }
+    throw error;
+  }
+}

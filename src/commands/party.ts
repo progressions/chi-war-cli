@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { listParties, getParty, createParty, updateParty, deleteParty, searchFaction } from "../lib/api.js";
+import { listParties, getParty, createParty, updateParty, deleteParty, searchFaction, listPartyTemplates, applyPartyTemplate, assignCharacterToSlot, clearSlot } from "../lib/api.js";
 import { getCurrentCampaignId } from "../lib/config.js";
 import { success, error, info } from "../lib/output.js";
 import * as fs from "fs";
@@ -221,6 +221,131 @@ export function registerPartyCommands(program: Command): void {
         success(`Deleted party: ${p.name}`);
       } catch (err) {
         error(err instanceof Error ? err.message : "Failed to delete party");
+        process.exit(1);
+      }
+    });
+
+  party
+    .command("templates")
+    .description("List available party templates")
+    .option("--json", "Output as JSON")
+    .action(async (options) => {
+      try {
+        const templates = await listPartyTemplates();
+
+        if (options.json) {
+          console.log(JSON.stringify(templates, null, 2));
+          return;
+        }
+
+        console.log("\nAvailable Party Templates:\n");
+        for (const t of templates) {
+          console.log(`  ${t.key}`);
+          console.log(`    Name: ${t.name}`);
+          console.log(`    ${t.description}`);
+          console.log(`    Slots:`);
+          for (const slot of t.slots) {
+            const mooks = slot.default_mook_count ? ` (${slot.default_mook_count} mooks)` : "";
+            console.log(`      - ${slot.label}: ${slot.role}${mooks}`);
+          }
+          console.log("");
+        }
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to list templates");
+        process.exit(1);
+      }
+    });
+
+  party
+    .command("apply-template")
+    .description("Apply a template to a party")
+    .argument("<party-id>", "Party ID")
+    .argument("<template-key>", "Template key (e.g., boss_fight, ambush)")
+    .option("--json", "Output as JSON")
+    .action(async (partyId, templateKey, options) => {
+      try {
+        const updated = await applyPartyTemplate(partyId, templateKey);
+
+        if (options.json) {
+          console.log(JSON.stringify(updated, null, 2));
+          return;
+        }
+
+        success(`Applied template "${templateKey}" to party: ${updated.name}`);
+        console.log(`\n  Composition Slots (${updated.slots?.length || 0}):`);
+        if (updated.slots) {
+          for (const slot of updated.slots) {
+            const char = slot.character ? slot.character.name : "(empty)";
+            const mooks = slot.default_mook_count ? ` x${slot.default_mook_count}` : "";
+            console.log(`    - ${slot.role}: ${char}${mooks}`);
+          }
+        }
+        console.log("");
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to apply template");
+        process.exit(1);
+      }
+    });
+
+  party
+    .command("assign-slot")
+    .description("Assign a character to a party slot")
+    .argument("<party-id>", "Party ID")
+    .argument("<slot-id>", "Slot ID")
+    .argument("<character-id>", "Character ID to assign")
+    .option("--json", "Output as JSON")
+    .action(async (partyId, slotId, characterId, options) => {
+      try {
+        const updated = await assignCharacterToSlot(partyId, slotId, characterId);
+
+        if (options.json) {
+          console.log(JSON.stringify(updated, null, 2));
+          return;
+        }
+
+        success(`Assigned character to slot in party: ${updated.name}`);
+        console.log(`\n  Composition Slots (${updated.slots?.length || 0}):`);
+        if (updated.slots) {
+          for (const slot of updated.slots) {
+            const char = slot.character ? slot.character.name : "(empty)";
+            const mooks = slot.default_mook_count ? ` x${slot.default_mook_count}` : "";
+            console.log(`    - ${slot.role}: ${char}${mooks}`);
+          }
+        }
+        console.log("");
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to assign character to slot");
+        process.exit(1);
+      }
+    });
+
+  party
+    .command("clear-slot")
+    .description("Clear a character from a party slot")
+    .argument("<party-id>", "Party ID")
+    .argument("<slot-id>", "Slot ID to clear")
+    .option("--json", "Output as JSON")
+    .action(async (partyId, slotId, options) => {
+      try {
+        const updated = await clearSlot(partyId, slotId);
+
+        if (options.json) {
+          console.log(JSON.stringify(updated, null, 2));
+          return;
+        }
+
+        success(`Cleared slot in party: ${updated.name}`);
+        console.log(`\n  Composition Slots (${updated.slots?.length || 0}):`);
+        if (updated.slots) {
+          for (const slot of updated.slots) {
+            const char = slot.character ? slot.character.name : "(empty)";
+            const mooks = slot.default_mook_count ? ` x${slot.default_mook_count}` : "";
+            console.log(`    - ${slot.role}: ${char}${mooks}`);
+          }
+        }
+        console.log("");
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to clear slot");
         process.exit(1);
       }
     });
