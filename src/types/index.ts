@@ -7,21 +7,41 @@ export type CharacterType =
   | "mook"
   | "ally";
 
+export interface ActionValues {
+  Type?: string;           // PC, NPC, Ally, Mook, Featured Foe, Boss, Uber-Boss
+  Guns?: number;
+  "Martial Arts"?: number;
+  Sorcery?: number;
+  Scroungetech?: number;
+  Creature?: number;
+  Mutant?: number;
+  Defense?: number;
+  Toughness?: number;
+  Speed?: number;
+  Fortune?: number;
+  "Max Fortune"?: number;
+  Wounds?: number;
+  MainAttack?: string;
+  SecondaryAttack?: string | null;
+  Archetype?: string;
+  Damage?: number;
+  FortuneType?: string;
+  [key: string]: unknown;  // Allow other custom fields
+}
+
 export interface Character {
   id: string;
   name: string;
-  character_type: CharacterType;
   active: boolean;
-  wounds: number;
-  max_wounds: number;
-  impairments: number;
-  defense: number;
-  speed: number;
-  toughness: number;
-  fortune: number;
-  max_fortune: number;
-  description?: string;
+  action_values?: ActionValues;
+  description?: Record<string, string>;
+  summary?: string;
   campaign_id: string;
+  faction_id?: string;
+  juncture_id?: string;
+  user_id?: string;
+  is_template?: boolean;
+  impairments?: number;
   created_at: string;
   updated_at: string;
 }

@@ -1,30 +1,9 @@
 import { Command } from "commander";
-import { createCharacter, listCampaigns } from "../lib/api.js";
+import { createCharacterRaw, updateCharacterRaw, listCampaigns, searchFaction } from "../lib/api.js";
 import { getCurrentCampaignId, setCurrentCampaignId } from "../lib/config.js";
-import { success, error, info, table } from "../lib/output.js";
-import type { CharacterType } from "../types/index.js";
+import { success, error, info } from "../lib/output.js";
 import inquirer from "inquirer";
-
-const VALID_TYPES: CharacterType[] = [
-  "pc",
-  "npc",
-  "featured_foe",
-  "boss",
-  "uber_boss",
-  "mook",
-  "ally",
-];
-
-// Default wounds by character type
-const DEFAULT_WOUNDS: Record<CharacterType, number> = {
-  pc: 0,
-  npc: 0,
-  featured_foe: 0,
-  boss: 0,
-  uber_boss: 0,
-  mook: 0,
-  ally: 0,
-};
+import * as fs from "fs";
 
 export function registerCharacterCommands(program: Command): void {
   const character = program
@@ -33,32 +12,40 @@ export function registerCharacterCommands(program: Command): void {
 
   character
     .command("create")
-    .description("Create a new character")
-    .requiredOption("-n, --name <name>", "Character name")
-    .requiredOption(
-      "-t, --type <type>",
-      `Character type (${VALID_TYPES.join("|")})`
-    )
-    .option("-w, --wounds <number>", "Starting wounds", parseInt)
-    .option("-d, --defense <number>", "Defense value", parseInt)
-    .option("-s, --speed <number>", "Speed value", parseInt)
-    .option("--toughness <number>", "Toughness value", parseInt)
-    .option("-f, --fortune <number>", "Fortune points", parseInt)
-    .option("--description <text>", "Character description")
+    .description("Create a new character from JSON")
+    .argument("[json]", "Character JSON (inline)")
+    .option("-f, --file <path>", "Read character JSON from file")
     .option("-c, --campaign <id>", "Campaign ID (uses current if not specified)")
-    .action(async (options) => {
+    .option("--faction <name>", "Assign to faction (by name, fuzzy match)")
+    .action(async (jsonArg, options) => {
       try {
-        // Validate type
-        if (!VALID_TYPES.includes(options.type as CharacterType)) {
-          error(`Invalid type "${options.type}". Must be one of: ${VALID_TYPES.join(", ")}`);
+        // Get JSON from argument or file
+        let characterJson: Record<string, unknown>;
+
+        if (options.file) {
+          // Read from file
+          const fileContent = fs.readFileSync(options.file, "utf-8");
+          characterJson = JSON.parse(fileContent);
+        } else if (jsonArg) {
+          // Parse inline JSON
+          characterJson = JSON.parse(jsonArg);
+        } else {
+          error("Provide character JSON as argument or use --file");
+          console.log("\nUsage:");
+          console.log('  chiwar character create \'{"name": "...", "action_values": {...}}\'');
+          console.log("  chiwar character create --file character.json");
+          console.log("\nExample:");
+          console.log(`  chiwar character create '${JSON.stringify({
+            name: "Triad Thug",
+            action_values: { Type: "Mook", Guns: 8, MainAttack: "Guns" }
+          })}'`);
           process.exit(1);
         }
 
-        // Determine campaign ID
+        // Ensure campaign is set
         let campaignId = options.campaign || getCurrentCampaignId();
 
         if (!campaignId) {
-          // Need to select a campaign
           info("No campaign selected. Fetching your campaigns...");
           const campaigns = await listCampaigns();
 
@@ -88,32 +75,88 @@ export function registerCharacterCommands(program: Command): void {
           }
         }
 
-        const characterType = options.type as CharacterType;
+        // Handle faction lookup if specified
+        if (options.faction) {
+          const faction = await searchFaction(options.faction);
+          if (!faction) {
+            error(`No faction found matching "${options.faction}"`);
+            console.log("\nUse 'chiwar faction list' to see all factions");
+            process.exit(1);
+          }
+          characterJson.faction_id = faction.id;
+          info(`Faction: ${faction.name}`);
+        }
 
-        const character = await createCharacter(
-          {
-            name: options.name,
-            character_type: characterType,
-            wounds: options.wounds ?? DEFAULT_WOUNDS[characterType],
-            defense: options.defense,
-            speed: options.speed,
-            toughness: options.toughness,
-            fortune: options.fortune,
-            description: options.description,
-          },
-          campaignId
-        );
+        // Create the character
+        const created = await createCharacterRaw(characterJson, campaignId);
 
-        success(`Created character: ${character.name}`);
-        table({
-          ID: character.id,
-          Type: character.character_type,
-          Defense: character.defense,
-          Speed: character.speed,
-          Toughness: character.toughness,
-        });
+        success(`Created character: ${created.name}`);
+        console.log(`  ID: ${created.id}`);
+        console.log(`  Type: ${created.action_values?.Type || "PC"}`);
+
+        if (created.action_values) {
+          const av = created.action_values;
+          if (av.MainAttack) console.log(`  Attack: ${av.MainAttack} ${av[av.MainAttack] || 0}`);
+          if (av.Defense) console.log(`  Defense: ${av.Defense}`);
+          if (av.Toughness) console.log(`  Toughness: ${av.Toughness}`);
+          if (av.Speed) console.log(`  Speed: ${av.Speed}`);
+        }
       } catch (err) {
-        error(err instanceof Error ? err.message : "Failed to create character");
+        if (err instanceof SyntaxError) {
+          error("Invalid JSON: " + err.message);
+        } else {
+          error(err instanceof Error ? err.message : "Failed to create character");
+        }
+        process.exit(1);
+      }
+    });
+
+  character
+    .command("update")
+    .description("Update an existing character from JSON")
+    .argument("<id>", "Character ID to update")
+    .argument("[json]", "Character JSON (inline)")
+    .option("-f, --file <path>", "Read character JSON from file")
+    .action(async (id, jsonArg, options) => {
+      try {
+        // Get JSON from argument or file
+        let characterJson: Record<string, unknown>;
+
+        if (options.file) {
+          // Read from file
+          const fileContent = fs.readFileSync(options.file, "utf-8");
+          characterJson = JSON.parse(fileContent);
+        } else if (jsonArg) {
+          // Parse inline JSON
+          characterJson = JSON.parse(jsonArg);
+        } else {
+          error("Provide character JSON as argument or use --file");
+          console.log("\nUsage:");
+          console.log('  chiwar character update <id> \'{"name": "...", "action_values": {...}}\'');
+          console.log("  chiwar character update <id> --file character.json");
+          process.exit(1);
+        }
+
+        // Update the character
+        const updated = await updateCharacterRaw(id, characterJson);
+
+        success(`Updated character: ${updated.name}`);
+        console.log(`  ID: ${updated.id}`);
+        console.log(`  Type: ${updated.action_values?.Type || "PC"}`);
+
+        if (updated.action_values) {
+          const av = updated.action_values;
+          if (av.MainAttack) console.log(`  Attack: ${av.MainAttack} ${av[av.MainAttack] || 0}`);
+          if (av.Defense) console.log(`  Defense: ${av.Defense}`);
+          if (av.Toughness) console.log(`  Toughness: ${av.Toughness}`);
+          if (av.Speed) console.log(`  Speed: ${av.Speed}`);
+        }
+      } catch (err) {
+        if (err instanceof SyntaxError) {
+          error("Invalid JSON: " + err.message);
+        } else {
+          error(err instanceof Error ? err.message : "Failed to update character");
+        }
         process.exit(1);
       }
     });

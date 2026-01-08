@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 
 import { Command } from "commander";
-import { loginCommand } from "./commands/login.js";
+import { loginCommand, logoutCommand } from "./commands/login.js";
 import { registerCharacterCommands } from "./commands/character.js";
+import { registerConfigCommands } from "./commands/config.js";
+import { registerFactionCommands } from "./commands/faction.js";
 
 const program = new Command();
 
@@ -14,11 +16,23 @@ program
 // Login command
 program
   .command("login")
-  .description("Authenticate with Chi War")
+  .description("Authenticate with Chi War via browser")
   .action(loginCommand);
+
+// Logout command
+program
+  .command("logout")
+  .description("Clear saved authentication")
+  .action(logoutCommand);
 
 // Character commands
 registerCharacterCommands(program);
+
+// Config commands
+registerConfigCommands(program);
+
+// Faction commands
+registerFactionCommands(program);
 
 // Parse and execute
 program.parse();
