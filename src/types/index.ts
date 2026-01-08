@@ -131,3 +131,42 @@ export interface CampaignListResponse {
   campaigns: Campaign[];
   meta: PaginationMeta;
 }
+
+export interface Shot {
+  id: string;
+  shot: number;
+  character_id?: string;
+  vehicle_id?: string;
+  fight_id: string;
+  character?: {
+    id: string;
+    name: string;
+    action_values?: ActionValues;
+    image_url?: string;
+  };
+  vehicle?: {
+    id: string;
+    name: string;
+  };
+}
+
+export interface Fight {
+  id: string;
+  name: string;
+  description?: string;
+  active: boolean;
+  ended: boolean;
+  sequence: number;
+  campaign_id: string;
+  site_id?: string;
+  image_url?: string;
+  created_at: string;
+  updated_at: string;
+  shots?: Shot[];
+  site?: { id: string; name: string };
+}
+
+export interface FightListResponse {
+  fights: Fight[];
+  meta: PaginationMeta;
+}

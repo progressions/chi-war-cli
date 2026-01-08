@@ -6,6 +6,7 @@ import { registerCampaignCommands } from "./commands/campaign.js";
 import { registerCharacterCommands } from "./commands/character.js";
 import { registerConfigCommands } from "./commands/config.js";
 import { registerFactionCommands } from "./commands/faction.js";
+import { registerFightCommands } from "./commands/fight.js";
 import { registerPartyCommands } from "./commands/party.js";
 
 const program = new Command();
@@ -38,6 +39,9 @@ registerConfigCommands(program);
 
 // Faction commands
 registerFactionCommands(program);
+
+// Fight commands
+registerFightCommands(program);
 
 // Party commands
 registerPartyCommands(program);
