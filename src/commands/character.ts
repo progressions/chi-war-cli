@@ -1,9 +1,10 @@
 import { Command } from "commander";
-import { createCharacterRaw, updateCharacterRaw, listCampaigns, searchFaction } from "../lib/api.js";
+import { createCharacterRaw, updateCharacterRaw, listCampaigns, searchFaction, listCharacters, getCharacter } from "../lib/api.js";
 import { getCurrentCampaignId, setCurrentCampaignId } from "../lib/config.js";
 import { success, error, info } from "../lib/output.js";
 import inquirer from "inquirer";
 import * as fs from "fs";
+import type { Character } from "../types/index.js";
 
 export function registerCharacterCommands(program: Command): void {
   const character = program
@@ -160,4 +161,124 @@ export function registerCharacterCommands(program: Command): void {
         process.exit(1);
       }
     });
+
+  character
+    .command("list")
+    .description("List characters in the current campaign")
+    .option("-n, --limit <number>", "Number of characters to show", "10")
+    .option("-p, --page <number>", "Page number", "1")
+    .option("-t, --type <type>", "Filter by type (Mook, Featured Foe, Boss, etc.)")
+    .option("--json", "Output as JSON")
+    .action(async (options) => {
+      try {
+        const campaignId = getCurrentCampaignId();
+        if (!campaignId) {
+          error("No campaign selected. Run 'chiwar config set campaign <id>'");
+          process.exit(1);
+        }
+
+        const result = await listCharacters({
+          campaignId,
+          limit: parseInt(options.limit),
+          page: parseInt(options.page),
+          sort: "created_at",
+          direction: "desc",
+        });
+
+        let characters = result.characters;
+
+        // Filter by type if specified
+        if (options.type) {
+          const typeFilter = options.type.toLowerCase();
+          characters = characters.filter((c) => {
+            const charType = c.action_values?.Type?.toLowerCase() || "";
+            return charType.includes(typeFilter);
+          });
+        }
+
+        if (options.json) {
+          console.log(JSON.stringify(characters, null, 2));
+          return;
+        }
+
+        if (characters.length === 0) {
+          info("No characters found");
+          return;
+        }
+
+        console.log(`\nCharacters (${result.meta.total_count} total):\n`);
+        for (const char of characters) {
+          printCharacterSummary(char);
+        }
+
+        if (result.meta.total_pages > 1) {
+          console.log(`\nPage ${result.meta.current_page} of ${result.meta.total_pages}`);
+        }
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to list characters");
+        process.exit(1);
+      }
+    });
+
+  character
+    .command("show")
+    .description("Show details of a specific character")
+    .argument("<id>", "Character ID")
+    .option("--json", "Output as JSON")
+    .action(async (id, options) => {
+      try {
+        const char = await getCharacter(id);
+
+        if (options.json) {
+          console.log(JSON.stringify(char, null, 2));
+          return;
+        }
+
+        printCharacterDetails(char);
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to get character");
+        process.exit(1);
+      }
+    });
+}
+
+function printCharacterSummary(char: Character): void {
+  const av = char.action_values || {};
+  const type = av.Type || "PC";
+  const mainAttack = av.MainAttack;
+  const attackValue = mainAttack ? av[mainAttack] : null;
+
+  let stats = "";
+  if (attackValue) stats += `${mainAttack} ${attackValue}`;
+  if (av.Defense) stats += stats ? `, Def ${av.Defense}` : `Def ${av.Defense}`;
+
+  console.log(`  ${char.name}`);
+  console.log(`    ID: ${char.id}`);
+  console.log(`    Type: ${type}${stats ? ` | ${stats}` : ""}`);
+  console.log("");
+}
+
+function printCharacterDetails(char: Character): void {
+  const av = char.action_values || {};
+
+  console.log(`\n${char.name}`);
+  console.log("=".repeat(char.name.length));
+  console.log(`  ID: ${char.id}`);
+  console.log(`  Type: ${av.Type || "PC"}`);
+
+  if (av.MainAttack) {
+    const mainVal = av[av.MainAttack];
+    console.log(`  Main Attack: ${av.MainAttack} ${mainVal || 0}`);
+  }
+
+  if (av.Defense) console.log(`  Defense: ${av.Defense}`);
+  if (av.Toughness) console.log(`  Toughness: ${av.Toughness}`);
+  if (av.Speed) console.log(`  Speed: ${av.Speed}`);
+  if (av.Fortune) console.log(`  Fortune: ${av.Fortune}`);
+  if (av.Wounds) console.log(`  Wounds: ${av.Wounds}`);
+
+  if (char.faction_id) console.log(`  Faction ID: ${char.faction_id}`);
+
+  console.log(`  Created: ${new Date(char.created_at).toLocaleDateString()}`);
+  console.log("");
 }
