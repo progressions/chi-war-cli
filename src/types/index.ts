@@ -333,3 +333,32 @@ export interface AiAttachResponse {
   entity: Record<string, unknown>;
   serializer: string;
 }
+
+// Media Library types
+export interface MediaLibraryImage {
+  id: string;
+  status: "orphan" | "attached";
+  source: "ai_generated" | "uploaded";
+  imagekit_url: string;
+  entity_type: EntityClass | null;
+  entity_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MediaLibraryResponse {
+  images: MediaLibraryImage[];
+  meta: {
+    page: number;
+    per_page: number;
+    total_count: number;
+    total_pages: number;
+  };
+  stats: {
+    total: number;
+    orphan: number;
+    attached: number;
+    ai_generated: number;
+    uploaded: number;
+  };
+}

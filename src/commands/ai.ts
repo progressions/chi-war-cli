@@ -4,9 +4,55 @@ import {
   attachEntityImage,
   aiCreateCharacter,
   aiExtendCharacter,
+  getOrphanAiImages,
 } from "../lib/api.js";
-import { success, error, info } from "../lib/output.js";
-import type { EntityClass } from "../types/index.js";
+import { success, error, info, warn } from "../lib/output.js";
+import type { EntityClass, MediaLibraryImage } from "../types/index.js";
+
+// Polling configuration
+const POLL_INTERVAL_MS = 3000;  // Check every 3 seconds
+const POLL_TIMEOUT_MS = 120000; // Timeout after 2 minutes
+const EXPECTED_NEW_IMAGES = 3;  // AI generates 3 images
+
+/**
+ * Sleep for a given number of milliseconds.
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Poll the media library for new orphan AI-generated images.
+ * Returns the new images when they appear, or null on timeout.
+ */
+async function pollForNewImages(
+  initialImageIds: Set<string>,
+  expectedCount: number
+): Promise<MediaLibraryImage[] | null> {
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < POLL_TIMEOUT_MS) {
+    await sleep(POLL_INTERVAL_MS);
+
+    try {
+      const currentImages = await getOrphanAiImages();
+      const newImages = currentImages.filter((img) => !initialImageIds.has(img.id));
+
+      if (newImages.length >= expectedCount) {
+        return newImages;
+      }
+
+      // Show progress
+      if (newImages.length > 0) {
+        process.stdout.write(`\r  Generated ${newImages.length}/${expectedCount} images...`);
+      }
+    } catch {
+      // Continue polling on error
+    }
+  }
+
+  return null; // Timeout
+}
 
 const VALID_ENTITY_TYPES = [
   "character",
@@ -44,8 +90,9 @@ export function registerAiCommands(program: Command): void {
   // IMAGE - Generate images for an entity
   ai
     .command("image <entity-type> <entity-id>")
-    .description("Generate AI images for an entity")
-    .action(async (entityType, entityId) => {
+    .description("Generate AI images for an entity (polls and auto-attaches first image)")
+    .option("--no-attach", "Skip auto-attach, just generate images")
+    .action(async (entityType, entityId, options) => {
       try {
         const entityClass = normalizeEntityClass(entityType);
         if (!entityClass) {
@@ -54,11 +101,54 @@ export function registerAiCommands(program: Command): void {
           process.exit(1);
         }
 
+        // Get current orphan images before generating (to identify new ones)
+        let initialImageIds = new Set<string>();
+        if (options.attach !== false) {
+          try {
+            const existingImages = await getOrphanAiImages();
+            initialImageIds = new Set(existingImages.map((img) => img.id));
+          } catch {
+            // Continue without tracking existing images
+          }
+        }
+
         info(`Queuing image generation for ${entityClass} ${entityId}...`);
         const result = await generateEntityImage(entityClass, entityId);
         success(result.message);
-        console.log("\nImages will be generated in the background.");
-        console.log("Check the web app or websocket for completion notification.");
+
+        // If auto-attach is enabled, poll for new images and attach the first one
+        if (options.attach !== false) {
+          console.log("\nWaiting for images to be generated...");
+
+          const newImages = await pollForNewImages(initialImageIds, EXPECTED_NEW_IMAGES);
+
+          if (newImages && newImages.length > 0) {
+            console.log(""); // Clear the progress line
+            success(`Generated ${newImages.length} images`);
+
+            // Attach the first image (most recent, sorted by created_at desc)
+            const firstImage = newImages[0];
+            info(`Auto-attaching first image to ${entityClass}...`);
+
+            try {
+              const attachResult = await attachEntityImage(entityClass, entityId, firstImage.imagekit_url);
+              success(`Image attached successfully`);
+              if (attachResult.entity && typeof attachResult.entity === "object" && "name" in attachResult.entity) {
+                console.log(`  Entity: ${attachResult.entity.name}`);
+              }
+              console.log(`  Image URL: ${firstImage.imagekit_url}`);
+            } catch (attachErr) {
+              warn(`Generated images but failed to attach: ${attachErr instanceof Error ? attachErr.message : "Unknown error"}`);
+              console.log(`\nImages available in media library. Use 'chiwar ai attach' to attach manually.`);
+            }
+          } else {
+            warn("Timed out waiting for images. They may still be generating.");
+            console.log("Check the web app or use 'chiwar ai attach' when images are ready.");
+          }
+        } else {
+          console.log("\nImages will be generated in the background.");
+          console.log("Use 'chiwar ai attach' to attach an image when ready.");
+        }
       } catch (err) {
         error(err instanceof Error ? err.message : "Failed to generate image");
         process.exit(1);
