@@ -430,8 +430,11 @@ export async function setCurrentCampaign(campaignId: string): Promise<Campaign> 
   const client = createClient(token);
 
   try {
-    const response = await client.patch(`/api/v2/campaigns/${campaignId}/set`);
-    return response.data;
+    const response = await client.post(`/api/v2/campaigns/current`, {
+      campaign_id: campaignId,
+    });
+    // Server returns {campaign: ..., user: ...}, extract campaign
+    return response.data.campaign;
   } catch (error) {
     if (error instanceof AxiosError && error.response) {
       if (error.response.status === 404) {
@@ -1979,4 +1982,73 @@ export async function getOrphanAiImages(): Promise<MediaLibraryImage[]> {
     limit: 50,
   });
   return response.images;
+}
+
+// =============================================================================
+// Session Notes API (Notion Integration)
+// =============================================================================
+
+export interface SessionNotesPage {
+  id: string;
+  title: string;
+}
+
+export interface SessionNotesResponse {
+  title: string;
+  page_id: string;
+  content: string;
+  pages?: SessionNotesPage[];
+}
+
+/**
+ * Fetch session notes from Notion by search query.
+ * Searches for pages matching the query (e.g., "5-10", "session 5-10").
+ */
+export async function fetchSessionNotes(query: string): Promise<SessionNotesResponse> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.get(`/api/v2/notion/sessions?q=${encodeURIComponent(query)}`);
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error(`No session found matching '${query}'`);
+      }
+      const data = error.response.data as ApiError;
+      throw new Error(data.error || data.message || "Failed to fetch session notes");
+    }
+    throw error;
+  }
+}
+
+/**
+ * Fetch a specific session page by ID.
+ */
+export async function fetchSessionById(pageId: string): Promise<SessionNotesResponse> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.get(`/api/v2/notion/sessions?id=${encodeURIComponent(pageId)}`);
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error("Session not found");
+      }
+      const data = error.response.data as ApiError;
+      throw new Error(data.error || data.message || "Failed to fetch session");
+    }
+    throw error;
+  }
 }
