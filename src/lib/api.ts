@@ -623,6 +623,27 @@ export async function getCharacter(characterId: string): Promise<Character> {
   }
 }
 
+export async function deleteCharacter(characterId: string): Promise<void> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    await client.delete(`/api/v2/characters/${characterId}`);
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error(`Character not found: ${characterId}`);
+      }
+      throw new Error("Failed to delete character");
+    }
+    throw error;
+  }
+}
+
 // =============================================================================
 // Party API
 // =============================================================================
@@ -1071,6 +1092,119 @@ export async function resetFight(fightId: string): Promise<Fight> {
         throw new Error(`Fight not found: ${fightId}`);
       }
       throw new Error("Failed to reset fight");
+    }
+    throw error;
+  }
+}
+
+export async function addPartyToFight(fightId: string, partyId: string): Promise<Fight> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.post(`/api/v2/fights/${fightId}/add_party`, {
+      party_id: partyId,
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error(`Fight or party not found`);
+      }
+      if (error.response.status === 403) {
+        throw new Error("Only gamemaster can add parties to fights");
+      }
+      throw new Error("Failed to add party to fight");
+    }
+    throw error;
+  }
+}
+
+export async function addCharacterToFight(fightId: string, characterId: string): Promise<Fight> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    // Get current fight to get existing character_ids
+    const fightResponse = await client.get(`/api/v2/fights/${fightId}`);
+    const fight = fightResponse.data;
+
+    // Get existing character_ids
+    const existingIds: string[] = fight.character_ids || [];
+
+    // Check if character is already in fight
+    if (existingIds.includes(characterId)) {
+      throw new Error("Character is already in this fight");
+    }
+
+    // Add new character_id
+    const updatedIds = [...existingIds, characterId];
+
+    // Update fight with new character_ids
+    const response = await client.patch(`/api/v2/fights/${fightId}`, {
+      fight: { character_ids: updatedIds },
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error(`Fight or character not found`);
+      }
+      if (error.response.status === 403) {
+        throw new Error("Only gamemaster can add characters to fights");
+      }
+      throw new Error("Failed to add character to fight");
+    }
+    throw error;
+  }
+}
+
+export async function addVehicleToFight(fightId: string, vehicleId: string): Promise<Fight> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    // Get current fight to get existing vehicle_ids
+    const fightResponse = await client.get(`/api/v2/fights/${fightId}`);
+    const fight = fightResponse.data;
+
+    // Get existing vehicle_ids
+    const existingIds: string[] = fight.vehicle_ids || [];
+
+    // Check if vehicle is already in fight
+    if (existingIds.includes(vehicleId)) {
+      throw new Error("Vehicle is already in this fight");
+    }
+
+    // Add new vehicle_id
+    const updatedIds = [...existingIds, vehicleId];
+
+    // Update fight with new vehicle_ids
+    const response = await client.patch(`/api/v2/fights/${fightId}`, {
+      fight: { vehicle_ids: updatedIds },
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error(`Fight or vehicle not found`);
+      }
+      if (error.response.status === 403) {
+        throw new Error("Only gamemaster can add vehicles to fights");
+      }
+      throw new Error("Failed to add vehicle to fight");
     }
     throw error;
   }
