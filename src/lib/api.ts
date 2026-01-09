@@ -15,6 +15,8 @@ import type {
   FightListResponse,
   Site,
   SiteListResponse,
+  Juncture,
+  JunctureListResponse,
 } from "../types/index.js";
 
 export interface ApiError {
@@ -1197,6 +1199,149 @@ export async function deleteSite(siteId: string): Promise<void> {
         throw new Error(`Site not found: ${siteId}`);
       }
       throw new Error("Failed to delete site");
+    }
+    throw error;
+  }
+}
+
+// =============================================================================
+// Juncture API
+// =============================================================================
+
+export interface ListJuncturesOptions {
+  limit?: number;
+  page?: number;
+  active?: boolean;
+}
+
+export async function listJunctures(
+  options: ListJuncturesOptions = {}
+): Promise<JunctureListResponse> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  const params = new URLSearchParams();
+  if (options.limit) params.append("per_page", options.limit.toString());
+  if (options.page) params.append("page", options.page.toString());
+  if (options.active !== undefined) params.append("active", options.active.toString());
+
+  try {
+    const response = await client.get(`/api/v2/junctures?${params.toString()}`);
+    return {
+      junctures: response.data.junctures || [],
+      meta: response.data.meta || { current_page: 1, total_pages: 1, total_count: 0, per_page: 25 },
+    };
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      throw new Error("Failed to list junctures");
+    }
+    throw error;
+  }
+}
+
+export async function getJuncture(junctureId: string): Promise<Juncture> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.get(`/api/v2/junctures/${junctureId}`);
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error(`Juncture not found: ${junctureId}`);
+      }
+      throw new Error("Failed to get juncture");
+    }
+    throw error;
+  }
+}
+
+export async function createJuncture(
+  junctureData: Record<string, unknown>
+): Promise<Juncture> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.post("/api/v2/junctures", {
+      juncture: junctureData,
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      const data = error.response.data as ApiError;
+      if (data.errors) {
+        const messages = Object.entries(data.errors)
+          .map(([field, errs]) => `${field}: ${errs.join(", ")}`)
+          .join("; ");
+        throw new Error(`Failed to create juncture: ${messages}`);
+      }
+      throw new Error(data.message || "Failed to create juncture");
+    }
+    throw error;
+  }
+}
+
+export async function updateJuncture(
+  junctureId: string,
+  junctureData: Record<string, unknown>
+): Promise<Juncture> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.patch(`/api/v2/junctures/${junctureId}`, {
+      juncture: junctureData,
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      const data = error.response.data as ApiError;
+      if (data.errors) {
+        const messages = Object.entries(data.errors)
+          .map(([field, errs]) => `${field}: ${errs.join(", ")}`)
+          .join("; ");
+        throw new Error(`Failed to update juncture: ${messages}`);
+      }
+      throw new Error(data.message || "Failed to update juncture");
+    }
+    throw error;
+  }
+}
+
+export async function deleteJuncture(junctureId: string): Promise<void> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    await client.delete(`/api/v2/junctures/${junctureId}`);
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error(`Juncture not found: ${junctureId}`);
+      }
+      throw new Error("Failed to delete juncture");
     }
     throw error;
   }

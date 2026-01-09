@@ -9,6 +9,7 @@ import { registerFactionCommands } from "./commands/faction.js";
 import { registerFightCommands } from "./commands/fight.js";
 import { registerPartyCommands } from "./commands/party.js";
 import { registerSiteCommands } from "./commands/site.js";
+import { registerJunctureCommands } from "./commands/juncture.js";
 
 const program = new Command();
 
@@ -49,6 +50,9 @@ registerPartyCommands(program);
 
 // Site commands
 registerSiteCommands(program);
+
+// Juncture commands
+registerJunctureCommands(program);
 
 // Parse and execute
 program.parse();

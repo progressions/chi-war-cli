@@ -203,3 +203,21 @@ export interface SiteListResponse {
   sites: Site[];
   meta: PaginationMeta;
 }
+
+export interface Juncture {
+  id: string;
+  name: string;
+  description?: string;
+  active: boolean;
+  campaign_id: string;
+  start_year?: number;
+  end_year?: number;
+  image_url?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface JunctureListResponse {
+  junctures: Juncture[];
+  meta: PaginationMeta;
+}
