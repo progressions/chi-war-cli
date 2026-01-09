@@ -248,3 +248,27 @@ export interface VehicleListResponse {
   vehicles: Vehicle[];
   meta: PaginationMeta;
 }
+
+export interface Weapon {
+  id: string;
+  name: string;
+  description?: string;
+  active: boolean;
+  campaign_id: string;
+  character_id?: string;
+  damage?: number;
+  concealment?: number;
+  reload?: number;
+  juncture_id?: string;
+  category?: string;
+  image_url?: string;
+  created_at: string;
+  updated_at: string;
+  character?: { id: string; name: string };
+  juncture?: { id: string; name: string };
+}
+
+export interface WeaponListResponse {
+  weapons: Weapon[];
+  meta: PaginationMeta;
+}
