@@ -13,6 +13,8 @@ import type {
   PaginationMeta,
   Fight,
   FightListResponse,
+  Site,
+  SiteListResponse,
 } from "../types/index.js";
 
 export interface ApiError {
@@ -1052,6 +1054,149 @@ export async function resetFight(fightId: string): Promise<Fight> {
         throw new Error(`Fight not found: ${fightId}`);
       }
       throw new Error("Failed to reset fight");
+    }
+    throw error;
+  }
+}
+
+// =============================================================================
+// Site API
+// =============================================================================
+
+export interface ListSitesOptions {
+  limit?: number;
+  page?: number;
+  active?: boolean;
+}
+
+export async function listSites(
+  options: ListSitesOptions = {}
+): Promise<SiteListResponse> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  const params = new URLSearchParams();
+  if (options.limit) params.append("per_page", options.limit.toString());
+  if (options.page) params.append("page", options.page.toString());
+  if (options.active !== undefined) params.append("active", options.active.toString());
+
+  try {
+    const response = await client.get(`/api/v2/sites?${params.toString()}`);
+    return {
+      sites: response.data.sites || [],
+      meta: response.data.meta || { current_page: 1, total_pages: 1, total_count: 0, per_page: 25 },
+    };
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      throw new Error("Failed to list sites");
+    }
+    throw error;
+  }
+}
+
+export async function getSite(siteId: string): Promise<Site> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.get(`/api/v2/sites/${siteId}`);
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error(`Site not found: ${siteId}`);
+      }
+      throw new Error("Failed to get site");
+    }
+    throw error;
+  }
+}
+
+export async function createSite(
+  siteData: Record<string, unknown>
+): Promise<Site> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.post("/api/v2/sites", {
+      site: siteData,
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      const data = error.response.data as ApiError;
+      if (data.errors) {
+        const messages = Object.entries(data.errors)
+          .map(([field, errs]) => `${field}: ${errs.join(", ")}`)
+          .join("; ");
+        throw new Error(`Failed to create site: ${messages}`);
+      }
+      throw new Error(data.message || "Failed to create site");
+    }
+    throw error;
+  }
+}
+
+export async function updateSite(
+  siteId: string,
+  siteData: Record<string, unknown>
+): Promise<Site> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.patch(`/api/v2/sites/${siteId}`, {
+      site: siteData,
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      const data = error.response.data as ApiError;
+      if (data.errors) {
+        const messages = Object.entries(data.errors)
+          .map(([field, errs]) => `${field}: ${errs.join(", ")}`)
+          .join("; ");
+        throw new Error(`Failed to update site: ${messages}`);
+      }
+      throw new Error(data.message || "Failed to update site");
+    }
+    throw error;
+  }
+}
+
+export async function deleteSite(siteId: string): Promise<void> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    await client.delete(`/api/v2/sites/${siteId}`);
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error(`Site not found: ${siteId}`);
+      }
+      throw new Error("Failed to delete site");
     }
     throw error;
   }
