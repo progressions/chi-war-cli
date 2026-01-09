@@ -7,7 +7,13 @@ import {
   deleteFight,
   endFight,
   resetFight,
+  addPartyToFight,
+  addCharacterToFight,
+  addVehicleToFight,
+  getCharacter,
+  getVehicle,
 } from "../lib/api.js";
+import { getParty } from "../lib/api.js";
 import { success, error, info, warn } from "../lib/output.js";
 import * as fs from "fs";
 import type { Fight, Shot } from "../types/index.js";
@@ -227,6 +233,85 @@ export function registerFightCommands(program: Command): void {
         console.log(`  Sequence reset to ${updated.sequence}`);
       } catch (err) {
         error(err instanceof Error ? err.message : "Failed to reset fight");
+        process.exit(1);
+      }
+    });
+
+  // ADD-CHARACTER
+  fight
+    .command("add-character <fight-id> <character-id>")
+    .description("Add a character to a fight")
+    .action(async (fightId, characterId) => {
+      try {
+        // Get character info for display
+        const character = await getCharacter(characterId);
+
+        const updated = await addCharacterToFight(fightId, characterId);
+
+        success(`Added "${character.name}" to fight "${updated.name}"`);
+
+        // Show current combatants
+        if (updated.shots && updated.shots.length > 0) {
+          console.log(`  Total combatants: ${updated.shots.length}`);
+        }
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to add character to fight");
+        process.exit(1);
+      }
+    });
+
+  // ADD-VEHICLE
+  fight
+    .command("add-vehicle <fight-id> <vehicle-id>")
+    .description("Add a vehicle to a fight")
+    .action(async (fightId, vehicleId) => {
+      try {
+        // Get vehicle info for display
+        const vehicle = await getVehicle(vehicleId);
+
+        const updated = await addVehicleToFight(fightId, vehicleId);
+
+        success(`Added "${vehicle.name}" to fight "${updated.name}"`);
+
+        // Show current combatants
+        if (updated.shots && updated.shots.length > 0) {
+          console.log(`  Total combatants: ${updated.shots.length}`);
+        }
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to add vehicle to fight");
+        process.exit(1);
+      }
+    });
+
+  // ADD-PARTY
+  fight
+    .command("add-party <fight-id> <party-id>")
+    .description("Add all characters from a party to a fight")
+    .action(async (fightId, partyId) => {
+      try {
+        // Get party info for display
+        const party = await getParty(partyId);
+        const fightBefore = await getFight(fightId);
+
+        const updated = await addPartyToFight(fightId, partyId);
+
+        success(`Added party "${party.name}" to fight "${updated.name}"`);
+
+        // Count new characters added
+        const beforeCount = fightBefore.shots?.length || 0;
+        const afterCount = updated.shots?.length || 0;
+        const added = afterCount - beforeCount;
+
+        if (added > 0) {
+          console.log(`  Added ${added} combatant${added !== 1 ? 's' : ''} to the fight`);
+        }
+
+        // Show current combatants
+        if (updated.shots && updated.shots.length > 0) {
+          console.log(`  Total combatants: ${updated.shots.length}`);
+        }
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to add party to fight");
         process.exit(1);
       }
     });

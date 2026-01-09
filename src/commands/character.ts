@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { createCharacterRaw, updateCharacterRaw, listCampaigns, searchFaction, listCharacters, getCharacter } from "../lib/api.js";
+import { createCharacterRaw, updateCharacterRaw, listCampaigns, searchFaction, listCharacters, getCharacter, deleteCharacter } from "../lib/api.js";
 import { getCurrentCampaignId, setCurrentCampaignId } from "../lib/config.js";
 import { success, error, info } from "../lib/output.js";
 import inquirer from "inquirer";
@@ -257,6 +257,22 @@ export function registerCharacterCommands(program: Command): void {
         printCharacterDetails(char);
       } catch (err) {
         error(err instanceof Error ? err.message : "Failed to get character");
+        process.exit(1);
+      }
+    });
+
+  character
+    .command("delete")
+    .description("Delete a character")
+    .argument("<id>", "Character ID to delete")
+    .action(async (id) => {
+      try {
+        // Fetch the character first to display name
+        const char = await getCharacter(id);
+        await deleteCharacter(id);
+        success(`Deleted character: ${char.name}`);
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to delete character");
         process.exit(1);
       }
     });
