@@ -26,6 +26,8 @@ import type {
   EntityClass,
   AiJobResponse,
   AiAttachResponse,
+  MediaLibraryImage,
+  MediaLibraryResponse,
 } from "../types/index.js";
 
 export interface ApiError {
@@ -1918,4 +1920,63 @@ export async function aiExtendCharacter(
     }
     throw error;
   }
+}
+
+// =============================================================================
+// Media Library API
+// =============================================================================
+
+export interface ListMediaLibraryOptions {
+  status?: "orphan" | "attached";
+  source?: "ai_generated" | "uploaded";
+  limit?: number;
+  page?: number;
+}
+
+/**
+ * List images from the media library.
+ * Can filter by status (orphan/attached) and source (ai_generated/uploaded).
+ */
+export async function listMediaLibrary(
+  options: ListMediaLibraryOptions = {}
+): Promise<MediaLibraryResponse> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  const params = new URLSearchParams();
+  if (options.status) params.append("status", options.status);
+  if (options.source) params.append("source", options.source);
+  if (options.limit) params.append("per_page", options.limit.toString());
+  if (options.page) params.append("page", options.page.toString());
+
+  try {
+    const response = await client.get(`/api/v2/media_library?${params.toString()}`);
+    return {
+      images: response.data.images || [],
+      meta: response.data.meta || { page: 1, per_page: 50, total_count: 0, total_pages: 1 },
+      stats: response.data.stats || { total: 0, orphan: 0, attached: 0, ai_generated: 0, uploaded: 0 },
+    };
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      throw new Error("Failed to list media library");
+    }
+    throw error;
+  }
+}
+
+/**
+ * Get orphan AI-generated images from the media library.
+ * Convenience method for finding images that haven't been attached yet.
+ */
+export async function getOrphanAiImages(): Promise<MediaLibraryImage[]> {
+  const response = await listMediaLibrary({
+    status: "orphan",
+    source: "ai_generated",
+    limit: 50,
+  });
+  return response.images;
 }
