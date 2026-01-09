@@ -23,10 +23,14 @@ import type {
   WeaponListResponse,
   Schtick,
   SchtickListResponse,
+  EntityClass,
+  AiJobResponse,
+  AiAttachResponse,
 } from "../types/index.js";
 
 export interface ApiError {
-  message: string;
+  message?: string;
+  error?: string;
   errors?: Record<string, string[]>;
 }
 
@@ -1785,6 +1789,132 @@ export async function deleteSchtick(schtickId: string): Promise<void> {
         throw new Error(`Schtick not found: ${schtickId}`);
       }
       throw new Error("Failed to delete schtick");
+    }
+    throw error;
+  }
+}
+
+// =============================================================================
+// AI API
+// =============================================================================
+
+/**
+ * Generate AI images for an entity.
+ * This queues a background job - images will be generated asynchronously.
+ */
+export async function generateEntityImage(
+  entityClass: EntityClass,
+  entityId: string
+): Promise<AiJobResponse> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.post("/api/v2/ai_images", {
+      ai_image: {
+        entity_class: entityClass,
+        entity_id: entityId,
+      },
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      const data = error.response.data as ApiError;
+      throw new Error(data.message || data.error || "Failed to generate image");
+    }
+    throw error;
+  }
+}
+
+/**
+ * Attach an image from URL to an entity.
+ * GM only.
+ */
+export async function attachEntityImage(
+  entityClass: EntityClass,
+  entityId: string,
+  imageUrl: string
+): Promise<AiAttachResponse> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.post("/api/v2/ai_images/attach", {
+      ai_image: {
+        entity_class: entityClass,
+        entity_id: entityId,
+        image_url: imageUrl,
+      },
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      const data = error.response.data as ApiError;
+      throw new Error(data.message || data.error || "Failed to attach image");
+    }
+    throw error;
+  }
+}
+
+/**
+ * Create a character using AI from a description.
+ * This queues a background job - the character will be created asynchronously.
+ */
+export async function aiCreateCharacter(
+  description: string
+): Promise<AiJobResponse> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.post("/api/v2/ai", {
+      ai: {
+        description,
+      },
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      const data = error.response.data as ApiError;
+      throw new Error(data.message || data.error || "Failed to create character with AI");
+    }
+    throw error;
+  }
+}
+
+/**
+ * Extend an existing character with AI-generated content.
+ * This queues a background job - the character will be updated asynchronously.
+ */
+export async function aiExtendCharacter(
+  characterId: string
+): Promise<AiJobResponse> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.post(`/api/v2/ai/${characterId}/extend`);
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      const data = error.response.data as ApiError;
+      throw new Error(data.message || data.error || "Failed to extend character with AI");
     }
     throw error;
   }

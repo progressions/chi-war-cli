@@ -297,3 +297,39 @@ export interface SchtickListResponse {
   categories: string[];
   paths: string[];
 }
+
+// AI types
+export type EntityClass =
+  | "Character"
+  | "Vehicle"
+  | "Party"
+  | "Faction"
+  | "Site"
+  | "Weapon"
+  | "Schtick"
+  | "Fight"
+  | "Campaign";
+
+export interface AiJobResponse {
+  message: string;
+}
+
+export interface AiImageParams {
+  entity_class: EntityClass;
+  entity_id: string;
+}
+
+export interface AiImageAttachParams {
+  entity_class: EntityClass;
+  entity_id: string;
+  image_url: string;
+}
+
+export interface AiCreateParams {
+  description: string;
+}
+
+export interface AiAttachResponse {
+  entity: Record<string, unknown>;
+  serializer: string;
+}
