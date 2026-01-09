@@ -221,3 +221,30 @@ export interface JunctureListResponse {
   junctures: Juncture[];
   meta: PaginationMeta;
 }
+
+export interface VehicleActionValues {
+  Acceleration?: number;
+  Handling?: number;
+  Frame?: number;
+  Squeal?: number;
+  Crunch?: number;
+  Condition?: number;
+  [key: string]: unknown;
+}
+
+export interface Vehicle {
+  id: string;
+  name: string;
+  description?: string;
+  active: boolean;
+  campaign_id: string;
+  action_values?: VehicleActionValues;
+  image_url?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VehicleListResponse {
+  vehicles: Vehicle[];
+  meta: PaginationMeta;
+}

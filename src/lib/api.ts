@@ -17,6 +17,8 @@ import type {
   SiteListResponse,
   Juncture,
   JunctureListResponse,
+  Vehicle,
+  VehicleListResponse,
 } from "../types/index.js";
 
 export interface ApiError {
@@ -1342,6 +1344,149 @@ export async function deleteJuncture(junctureId: string): Promise<void> {
         throw new Error(`Juncture not found: ${junctureId}`);
       }
       throw new Error("Failed to delete juncture");
+    }
+    throw error;
+  }
+}
+
+// =============================================================================
+// Vehicle API
+// =============================================================================
+
+export interface ListVehiclesOptions {
+  limit?: number;
+  page?: number;
+  active?: boolean;
+}
+
+export async function listVehicles(
+  options: ListVehiclesOptions = {}
+): Promise<VehicleListResponse> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  const params = new URLSearchParams();
+  if (options.limit) params.append("per_page", options.limit.toString());
+  if (options.page) params.append("page", options.page.toString());
+  if (options.active !== undefined) params.append("active", options.active.toString());
+
+  try {
+    const response = await client.get(`/api/v2/vehicles?${params.toString()}`);
+    return {
+      vehicles: response.data.vehicles || [],
+      meta: response.data.meta || { current_page: 1, total_pages: 1, total_count: 0, per_page: 25 },
+    };
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      throw new Error("Failed to list vehicles");
+    }
+    throw error;
+  }
+}
+
+export async function getVehicle(vehicleId: string): Promise<Vehicle> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.get(`/api/v2/vehicles/${vehicleId}`);
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error(`Vehicle not found: ${vehicleId}`);
+      }
+      throw new Error("Failed to get vehicle");
+    }
+    throw error;
+  }
+}
+
+export async function createVehicle(
+  vehicleData: Record<string, unknown>
+): Promise<Vehicle> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.post("/api/v2/vehicles", {
+      vehicle: vehicleData,
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      const data = error.response.data as ApiError;
+      if (data.errors) {
+        const messages = Object.entries(data.errors)
+          .map(([field, errs]) => `${field}: ${errs.join(", ")}`)
+          .join("; ");
+        throw new Error(`Failed to create vehicle: ${messages}`);
+      }
+      throw new Error(data.message || "Failed to create vehicle");
+    }
+    throw error;
+  }
+}
+
+export async function updateVehicle(
+  vehicleId: string,
+  vehicleData: Record<string, unknown>
+): Promise<Vehicle> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.patch(`/api/v2/vehicles/${vehicleId}`, {
+      vehicle: vehicleData,
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      const data = error.response.data as ApiError;
+      if (data.errors) {
+        const messages = Object.entries(data.errors)
+          .map(([field, errs]) => `${field}: ${errs.join(", ")}`)
+          .join("; ");
+        throw new Error(`Failed to update vehicle: ${messages}`);
+      }
+      throw new Error(data.message || "Failed to update vehicle");
+    }
+    throw error;
+  }
+}
+
+export async function deleteVehicle(vehicleId: string): Promise<void> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    await client.delete(`/api/v2/vehicles/${vehicleId}`);
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error(`Vehicle not found: ${vehicleId}`);
+      }
+      throw new Error("Failed to delete vehicle");
     }
     throw error;
   }

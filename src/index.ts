@@ -10,6 +10,7 @@ import { registerFightCommands } from "./commands/fight.js";
 import { registerPartyCommands } from "./commands/party.js";
 import { registerSiteCommands } from "./commands/site.js";
 import { registerJunctureCommands } from "./commands/juncture.js";
+import { registerVehicleCommands } from "./commands/vehicle.js";
 
 const program = new Command();
 
@@ -53,6 +54,9 @@ registerSiteCommands(program);
 
 // Juncture commands
 registerJunctureCommands(program);
+
+// Vehicle commands
+registerVehicleCommands(program);
 
 // Parse and execute
 program.parse();
