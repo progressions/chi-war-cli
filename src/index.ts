@@ -15,6 +15,7 @@ import { registerWeaponCommands } from "./commands/weapon.js";
 import { registerSchtickCommands } from "./commands/schtick.js";
 import { registerAiCommands } from "./commands/ai.js";
 import { registerSessionCommands } from "./commands/session.js";
+import { registerNotionCommands } from "./commands/notion.js";
 
 const program = new Command();
 
@@ -73,6 +74,9 @@ registerAiCommands(program);
 
 // Session commands (Notion integration)
 registerSessionCommands(program);
+
+// Notion commands (general page search)
+registerNotionCommands(program);
 
 // Parse and execute
 program.parse();
