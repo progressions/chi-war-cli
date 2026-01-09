@@ -12,6 +12,7 @@ import { registerSiteCommands } from "./commands/site.js";
 import { registerJunctureCommands } from "./commands/juncture.js";
 import { registerVehicleCommands } from "./commands/vehicle.js";
 import { registerWeaponCommands } from "./commands/weapon.js";
+import { registerSchtickCommands } from "./commands/schtick.js";
 
 const program = new Command();
 
@@ -61,6 +62,9 @@ registerVehicleCommands(program);
 
 // Weapon commands
 registerWeaponCommands(program);
+
+// Schtick commands
+registerSchtickCommands(program);
 
 // Parse and execute
 program.parse();
