@@ -2052,3 +2052,40 @@ export async function fetchSessionById(pageId: string): Promise<SessionNotesResp
     throw error;
   }
 }
+
+// =============================================================================
+// Notion Search API
+// =============================================================================
+
+export interface NotionPage {
+  id: string;
+  title?: string;
+  name?: string;
+  url?: string;
+}
+
+/**
+ * Search all Notion pages by name.
+ * Uses the /notion/search endpoint which searches across all page types.
+ */
+export async function searchNotionPages(name: string): Promise<NotionPage[]> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.get(`/api/v2/notion/search`, {
+      params: { name },
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      const data = error.response.data as ApiError;
+      throw new Error(data.error || data.message || "Failed to search Notion");
+    }
+    throw error;
+  }
+}
