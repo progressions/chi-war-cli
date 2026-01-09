@@ -272,3 +272,28 @@ export interface WeaponListResponse {
   weapons: Weapon[];
   meta: PaginationMeta;
 }
+
+export interface Schtick {
+  id: string;
+  name: string;
+  description?: string;
+  active: boolean;
+  campaign_id: string;
+  category?: string;
+  path?: string;
+  color?: string;
+  bonus?: boolean;
+  archetypes?: string[];
+  prerequisite_id?: string;
+  image_url?: string;
+  created_at: string;
+  updated_at: string;
+  prerequisite?: { id: string; name: string; category?: string };
+}
+
+export interface SchtickListResponse {
+  schticks: Schtick[];
+  meta: PaginationMeta;
+  categories: string[];
+  paths: string[];
+}

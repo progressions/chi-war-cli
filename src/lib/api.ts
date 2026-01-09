@@ -21,6 +21,8 @@ import type {
   VehicleListResponse,
   Weapon,
   WeaponListResponse,
+  Schtick,
+  SchtickListResponse,
 } from "../types/index.js";
 
 export interface ApiError {
@@ -1634,6 +1636,155 @@ export async function deleteWeapon(weaponId: string): Promise<void> {
         throw new Error(`Weapon not found: ${weaponId}`);
       }
       throw new Error("Failed to delete weapon");
+    }
+    throw error;
+  }
+}
+
+// =============================================================================
+// Schtick API
+// =============================================================================
+
+export interface ListSchticksOptions {
+  limit?: number;
+  page?: number;
+  active?: boolean;
+  category?: string;
+  path?: string;
+}
+
+export async function listSchticks(
+  options: ListSchticksOptions = {}
+): Promise<SchtickListResponse> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  const params = new URLSearchParams();
+  if (options.limit) params.append("per_page", options.limit.toString());
+  if (options.page) params.append("page", options.page.toString());
+  if (options.active !== undefined) params.append("active", options.active.toString());
+  if (options.category) params.append("category", options.category);
+  if (options.path) params.append("path", options.path);
+
+  try {
+    const response = await client.get(`/api/v2/schticks?${params.toString()}`);
+    return {
+      schticks: response.data.schticks || [],
+      meta: response.data.meta || { current_page: 1, total_pages: 1, total_count: 0, per_page: 25 },
+      categories: response.data.categories || [],
+      paths: response.data.paths || [],
+    };
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      throw new Error("Failed to list schticks");
+    }
+    throw error;
+  }
+}
+
+export async function getSchtick(schtickId: string): Promise<Schtick> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.get(`/api/v2/schticks/${schtickId}`);
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error(`Schtick not found: ${schtickId}`);
+      }
+      throw new Error("Failed to get schtick");
+    }
+    throw error;
+  }
+}
+
+export async function createSchtick(
+  schtickData: Record<string, unknown>
+): Promise<Schtick> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.post("/api/v2/schticks", {
+      schtick: schtickData,
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      const data = error.response.data as ApiError;
+      if (data.errors) {
+        const messages = Object.entries(data.errors)
+          .map(([field, errs]) => `${field}: ${errs.join(", ")}`)
+          .join("; ");
+        throw new Error(`Failed to create schtick: ${messages}`);
+      }
+      throw new Error(data.message || "Failed to create schtick");
+    }
+    throw error;
+  }
+}
+
+export async function updateSchtick(
+  schtickId: string,
+  schtickData: Record<string, unknown>
+): Promise<Schtick> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.patch(`/api/v2/schticks/${schtickId}`, {
+      schtick: schtickData,
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      const data = error.response.data as ApiError;
+      if (data.errors) {
+        const messages = Object.entries(data.errors)
+          .map(([field, errs]) => `${field}: ${errs.join(", ")}`)
+          .join("; ");
+        throw new Error(`Failed to update schtick: ${messages}`);
+      }
+      throw new Error(data.message || "Failed to update schtick");
+    }
+    throw error;
+  }
+}
+
+export async function deleteSchtick(schtickId: string): Promise<void> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    await client.delete(`/api/v2/schticks/${schtickId}`);
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error(`Schtick not found: ${schtickId}`);
+      }
+      throw new Error("Failed to delete schtick");
     }
     throw error;
   }
