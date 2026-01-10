@@ -28,6 +28,8 @@ import type {
   AiAttachResponse,
   MediaLibraryImage,
   MediaLibraryResponse,
+  Encounter,
+  SwerveResult,
 } from "../types/index.js";
 
 export interface ApiError {
@@ -1205,6 +1207,163 @@ export async function addVehicleToFight(fightId: string, vehicleId: string): Pro
         throw new Error("Only gamemaster can add vehicles to fights");
       }
       throw new Error("Failed to add vehicle to fight");
+    }
+    throw error;
+  }
+}
+
+// =============================================================================
+// Encounter API (Combat Management)
+// =============================================================================
+
+export async function getEncounter(fightId: string): Promise<Encounter> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.get(`/api/v2/encounters/${fightId}`);
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error(`Encounter not found: ${fightId}`);
+      }
+      throw new Error("Failed to get encounter");
+    }
+    throw error;
+  }
+}
+
+export async function spendShots(
+  fightId: string,
+  shotId: string,
+  shots: number = 3
+): Promise<Encounter> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.patch(`/api/v2/encounters/${fightId}/act`, {
+      shot_id: shotId,
+      shots: shots,
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error(`Encounter or shot not found`);
+      }
+      if (error.response.status === 403) {
+        throw new Error("Only gamemaster can modify encounters");
+      }
+      throw new Error("Failed to spend shots");
+    }
+    throw error;
+  }
+}
+
+export interface CombatEvent {
+  event_type: string;
+  description: string;
+  details?: Record<string, unknown>;
+}
+
+export interface CombatUpdate {
+  shot_id: string;
+  character_id?: string;
+  wounds?: number;
+  impairments?: number;
+  count?: number;
+  action_values?: Record<string, unknown>;
+  add_status?: string[];
+  remove_status?: string[];
+  event?: CombatEvent;
+}
+
+export async function applyCombatAction(
+  fightId: string,
+  updates: CombatUpdate[]
+): Promise<Encounter> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.post(`/api/v2/encounters/${fightId}/apply_combat_action`, {
+      character_updates: updates,
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error(`Encounter not found`);
+      }
+      if (error.response.status === 403) {
+        throw new Error("Only gamemaster can apply combat actions");
+      }
+      throw new Error("Failed to apply combat action");
+    }
+    throw error;
+  }
+}
+
+export async function rollSwerve(): Promise<SwerveResult> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.post(`/api/v2/dice/swerve`);
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      throw new Error("Failed to roll swerve");
+    }
+    throw error;
+  }
+}
+
+export interface InitiativeUpdate {
+  id: string;
+  shot: number;
+}
+
+export async function updateInitiatives(
+  fightId: string,
+  shots: InitiativeUpdate[]
+): Promise<Encounter> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.patch(`/api/v2/encounters/${fightId}/update_initiatives`, {
+      shots: shots,
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error(`Encounter not found`);
+      }
+      throw new Error("Failed to update initiatives");
     }
     throw error;
   }

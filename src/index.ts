@@ -16,6 +16,7 @@ import { registerSchtickCommands } from "./commands/schtick.js";
 import { registerAiCommands } from "./commands/ai.js";
 import { registerSessionCommands } from "./commands/session.js";
 import { registerNotionCommands } from "./commands/notion.js";
+import { registerEncounterCommands } from "./commands/encounter.js";
 
 const program = new Command();
 
@@ -50,6 +51,9 @@ registerFactionCommands(program);
 
 // Fight commands
 registerFightCommands(program);
+
+// Encounter commands (combat management)
+registerEncounterCommands(program);
 
 // Party commands
 registerPartyCommands(program);
