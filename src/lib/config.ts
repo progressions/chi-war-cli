@@ -75,3 +75,18 @@ export function setCurrentCampaignId(campaignId: string | undefined): void {
   }
   saveConfig(config);
 }
+
+export function getCurrentEncounterId(): string | null {
+  const config = loadConfig() as Config & { currentEncounterId?: string };
+  return config.currentEncounterId ?? null;
+}
+
+export function setCurrentEncounterId(encounterId: string | undefined): void {
+  const config = loadConfig() as Config & { currentEncounterId?: string };
+  if (encounterId === undefined) {
+    delete config.currentEncounterId;
+  } else {
+    config.currentEncounterId = encounterId;
+  }
+  saveConfig(config as Config);
+}

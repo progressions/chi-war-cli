@@ -362,3 +362,117 @@ export interface MediaLibraryResponse {
     uploaded: number;
   };
 }
+
+// Encounter types for combat management
+export interface EncounterCharacter {
+  id: string;
+  name: string;
+  entity_class: "Character";
+  action_values: ActionValues;
+  skills?: Record<string, unknown>;
+  faction_id?: string;
+  color?: string;
+  count?: number;
+  impairments: number;
+  shot_id: string;
+  current_shot: number | null;
+  location?: string;
+  driving_id?: string;
+  driving?: EncounterVehicle;
+  status: string[];
+  image_url?: string;
+  faction?: { id: string; name: string };
+  weapon_ids: string[];
+  equipped_weapon_id?: string;
+  schtick_ids: string[];
+  effects: EncounterEffect[];
+  user_id?: string;
+  user?: { id: string; name: string; email: string };
+}
+
+export interface EncounterVehicle {
+  id: string;
+  name: string;
+  entity_class: "Vehicle";
+  action_values?: VehicleActionValues;
+  shot_id: string;
+  current_shot: number | null;
+  location?: string;
+  driver_id?: string;
+  driver?: { id: string; name: string; entity_class: "Character"; shot_id: string };
+  was_rammed_or_damaged?: boolean;
+  image_url?: string;
+  chase_relationships?: ChaseRelationship[];
+  effects: EncounterEffect[];
+}
+
+export interface EncounterEffect {
+  id: string;
+  name: string;
+  description?: string;
+  severity?: string;
+  action_value?: string;
+  change?: number;
+  shot_id: string;
+  character_id?: string;
+  vehicle_id?: string;
+}
+
+export interface ChaseRelationship {
+  id: string;
+  position: number;
+  pursuer_id: string;
+  evader_id: string;
+  is_pursuer: boolean;
+}
+
+export interface EncounterShot {
+  shot: number | null;
+  characters: EncounterCharacter[];
+  vehicles: EncounterVehicle[];
+}
+
+export interface Encounter {
+  id: string;
+  entity_class: "Fight";
+  name: string;
+  sequence: number;
+  description?: string;
+  started_at?: string;
+  ended_at?: string;
+  image_url?: string;
+  character_ids: string[];
+  vehicle_ids: string[];
+  action_id?: string;
+  shots: EncounterShot[];
+  character_effects: Record<string, EncounterEffect[]>;
+  vehicle_effects: Record<string, EncounterEffect[]>;
+}
+
+// Swerve (dice roll) types
+export interface SwerveResult {
+  positives: { sum: number; rolls: number[] };
+  negatives: { sum: number; rolls: number[] };
+  total: number;
+  boxcars: boolean;
+}
+
+// Combatant - unified type for fuzzy matching
+export interface Combatant {
+  type: "character" | "vehicle";
+  id: string;
+  name: string;
+  shotId: string;
+  currentShot: number | null;
+  characterType?: string; // PC, Mook, Boss, etc.
+  impairments: number;
+  count?: number; // For mooks
+  defense?: number;
+  toughness?: number;
+  mainAttack?: string;
+  attackValue?: number;
+  damage?: number;
+}
+
+// Re-export CombatUpdate from api.ts
+export type { CombatUpdate } from "../lib/api.js";
