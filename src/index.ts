@@ -15,6 +15,7 @@ import { registerWeaponCommands } from "./commands/weapon.js";
 import { registerSchtickCommands } from "./commands/schtick.js";
 import { registerAiCommands } from "./commands/ai.js";
 import { registerSessionCommands } from "./commands/session.js";
+import { registerAdventureCommands } from "./commands/adventure.js";
 import { registerNotionCommands } from "./commands/notion.js";
 import { registerEncounterCommands } from "./commands/encounter.js";
 
@@ -78,6 +79,9 @@ registerAiCommands(program);
 
 // Session commands (Notion integration)
 registerSessionCommands(program);
+
+// Adventure commands (Notion integration)
+registerAdventureCommands(program);
 
 // Notion commands (general page search)
 registerNotionCommands(program);
