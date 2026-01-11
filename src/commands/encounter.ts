@@ -7,6 +7,7 @@ import {
   applyCombatAction,
   updateFight,
   updateInitiatives,
+  updateShotLocation,
 } from "../lib/api.js";
 import { success, error, info, warn } from "../lib/output.js";
 import { getCurrentEncounterId, setCurrentEncounterId } from "../lib/config.js";
@@ -52,6 +53,7 @@ function extractCombatants(encounter: Encounter): Combatant[] {
         mainAttack,
         attackValue,
         damage: actionValues.Damage as number | undefined,
+        location: char.location,
       });
     }
 
@@ -64,6 +66,7 @@ function extractCombatants(encounter: Encounter): Combatant[] {
         shotId: veh.shot_id,
         currentShot: veh.current_shot,
         impairments: 0,
+        location: veh.location,
       });
     }
   }
@@ -1170,6 +1173,48 @@ export function registerEncounterCommands(program: Command): void {
         success(`Initiative rolled for ${combatants.length} combatants!`);
       } catch (err) {
         error(err instanceof Error ? err.message : "Failed to roll initiative");
+        process.exit(1);
+      }
+    });
+
+  // LOCATION - Set a character's location in the fight
+  encounter
+    .command("location <character> <location>")
+    .description("Set a character's location in the current fight")
+    .action(async (characterName, locationStr) => {
+      try {
+        const encounterId = getCurrentEncounterId();
+        if (!encounterId) {
+          error("No encounter set. Use 'encounter set <fight-id>' first.");
+          process.exit(1);
+        }
+
+        // Get encounter and find character
+        const enc = await getEncounter(encounterId);
+        const combatants = extractCombatants(enc);
+        const match = findCombatant(characterName, combatants);
+
+        if (!match) {
+          error(`No combatant found matching "${characterName}"`);
+          listCombatantNames(combatants);
+          process.exit(1);
+        }
+        if (Array.isArray(match)) {
+          error(`Ambiguous name "${characterName}". Did you mean:`);
+          for (const c of match) {
+            console.log(`  ${c.name}`);
+          }
+          process.exit(1);
+        }
+
+        const oldLocation = match.location || "(none)";
+
+        // Update location via direct shot update
+        await updateShotLocation(encounterId, match.shotId, locationStr);
+
+        success(`${match.name}: ${oldLocation} → ${locationStr}`);
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to set location");
         process.exit(1);
       }
     });

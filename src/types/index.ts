@@ -472,6 +472,7 @@ export interface Combatant {
   mainAttack?: string;
   attackValue?: number;
   damage?: number;
+  location?: string; // Current location in fight
 }
 
 // Re-export CombatUpdate from api.ts

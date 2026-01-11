@@ -1282,6 +1282,7 @@ export interface CombatUpdate {
   wounds?: number;
   impairments?: number;
   count?: number;
+  location?: string;
   action_values?: Record<string, unknown>;
   add_status?: string[];
   remove_status?: string[];
@@ -1313,6 +1314,33 @@ export async function applyCombatAction(
         throw new Error("Only gamemaster can apply combat actions");
       }
       throw new Error("Failed to apply combat action");
+    }
+    throw error;
+  }
+}
+
+export async function updateShotLocation(
+  fightId: string,
+  shotId: string,
+  location: string
+): Promise<void> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    await client.patch(`/api/v2/fights/${fightId}/shots/${shotId}`, {
+      shot: { location },
+    });
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error("Shot not found");
+      }
+      throw new Error("Failed to update location");
     }
     throw error;
   }
