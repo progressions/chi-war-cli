@@ -120,6 +120,18 @@ export interface Campaign {
   updated_at: string;
 }
 
+export interface Notification {
+  id: string;
+  type: string;
+  title: string;
+  message: string | null;
+  payload: Record<string, unknown>;
+  read_at: string | null;
+  dismissed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface PaginationMeta {
   current_page: number;
   total_pages: number;

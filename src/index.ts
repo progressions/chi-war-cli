@@ -17,6 +17,7 @@ import { registerAiCommands } from "./commands/ai.js";
 import { registerSessionCommands } from "./commands/session.js";
 import { registerNotionCommands } from "./commands/notion.js";
 import { registerEncounterCommands } from "./commands/encounter.js";
+import { registerNotificationCommands } from "./commands/notification.js";
 
 const program = new Command();
 
@@ -81,6 +82,9 @@ registerSessionCommands(program);
 
 // Notion commands (general page search)
 registerNotionCommands(program);
+
+// Notification commands (gamemaster only)
+registerNotificationCommands(program);
 
 // Parse and execute
 program.parse();
