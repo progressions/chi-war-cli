@@ -30,6 +30,7 @@ import type {
   MediaLibraryResponse,
   Encounter,
   SwerveResult,
+  Notification,
 } from "../types/index.js";
 
 export interface ApiError {
@@ -2406,6 +2407,50 @@ export async function searchNotionPages(name: string): Promise<NotionPage[]> {
     if (error instanceof AxiosError && error.response) {
       const data = error.response.data as ApiError;
       throw new Error(data.error || data.message || "Failed to search Notion");
+    }
+    throw error;
+  }
+}
+
+// Notification API
+
+export interface SendNotificationParams {
+  user_email?: string;
+  user_id?: string;
+  title: string;
+  message?: string;
+  type?: string;
+}
+
+/**
+ * Send a notification to a campaign member.
+ * Only gamemasters can send notifications, and only to members of their current campaign.
+ */
+export async function sendNotification(
+  params: SendNotificationParams
+): Promise<Notification> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.post("/api/v2/notifications", {
+      notification: {
+        user_email: params.user_email,
+        user_id: params.user_id,
+        title: params.title,
+        message: params.message,
+        type: params.type || "gm_announcement",
+      },
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      const data = error.response.data as ApiError;
+      throw new Error(data.error || data.message || "Failed to send notification");
     }
     throw error;
   }
