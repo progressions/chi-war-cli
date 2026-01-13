@@ -42,6 +42,7 @@ export interface Character {
   user_id?: string;
   is_template?: boolean;
   impairments?: number;
+  at_a_glance?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -52,6 +53,7 @@ export interface User {
   first_name?: string;
   last_name?: string;
   gamemaster?: boolean;
+  at_a_glance?: boolean;
 }
 
 export interface Config {
@@ -86,6 +88,7 @@ export interface Party {
   juncture_id?: string;
   character_ids: string[];
   vehicle_ids: string[];
+  at_a_glance?: boolean;
   created_at: string;
   updated_at: string;
   image_url?: string;
@@ -116,6 +119,7 @@ export interface Campaign {
   gamemaster_id: string;
   current_fight_id?: string;
   image_url?: string;
+  at_a_glance?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -204,6 +208,7 @@ export interface Site {
   juncture_id?: string;
   faction_id?: string;
   image_url?: string;
+  at_a_glance?: boolean;
   created_at: string;
   updated_at: string;
   juncture?: { id: string; name: string };
@@ -225,6 +230,7 @@ export interface Juncture {
   start_year?: number;
   end_year?: number;
   image_url?: string;
+  at_a_glance?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -252,6 +258,7 @@ export interface Vehicle {
   campaign_id: string;
   action_values?: VehicleActionValues;
   image_url?: string;
+  at_a_glance?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -274,6 +281,7 @@ export interface Weapon {
   juncture_id?: string;
   category?: string;
   image_url?: string;
+  at_a_glance?: boolean;
   created_at: string;
   updated_at: string;
   character?: { id: string; name: string };
@@ -298,6 +306,7 @@ export interface Schtick {
   archetypes?: string[];
   prerequisite_id?: string;
   image_url?: string;
+  at_a_glance?: boolean;
   created_at: string;
   updated_at: string;
   prerequisite?: { id: string; name: string; category?: string };

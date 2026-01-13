@@ -454,6 +454,7 @@ export interface Faction {
   name: string;
   description?: string;
   campaign_id: string;
+  at_a_glance?: boolean;
 }
 
 export async function listFactions(): Promise<Faction[]> {
@@ -506,7 +507,7 @@ export async function searchFaction(query: string): Promise<Faction | null> {
   return match || null;
 }
 
-export async function getFaction(id: string): Promise<Faction> {
+export async function getFaction(factionId: string): Promise<Faction> {
   const token = getToken();
   if (!token) {
     throw new Error("Not authenticated. Run 'chiwar login' first.");
@@ -515,12 +516,12 @@ export async function getFaction(id: string): Promise<Faction> {
   const client = createClient(token);
 
   try {
-    const response = await client.get(`/api/v2/factions/${id}`);
+    const response = await client.get(`/api/v2/factions/${factionId}`);
     return response.data;
   } catch (error) {
     if (error instanceof AxiosError && error.response) {
       if (error.response.status === 404) {
-        throw new Error(`Faction not found: ${id}`);
+        throw new Error(`Faction not found: ${factionId}`);
       }
       throw new Error("Failed to get faction");
     }
@@ -528,7 +529,9 @@ export async function getFaction(id: string): Promise<Faction> {
   }
 }
 
-export async function createFaction(data: Record<string, unknown>): Promise<Faction> {
+export async function createFaction(
+  factionData: Record<string, unknown>
+): Promise<Faction> {
   const token = getToken();
   if (!token) {
     throw new Error("Not authenticated. Run 'chiwar login' first.");
@@ -538,22 +541,28 @@ export async function createFaction(data: Record<string, unknown>): Promise<Fact
 
   try {
     const response = await client.post("/api/v2/factions", {
-      faction: data,
+      faction: factionData,
     });
     return response.data;
   } catch (error) {
     if (error instanceof AxiosError && error.response) {
-      const errors = error.response.data?.errors;
-      if (errors) {
-        throw new Error(`Failed to create faction: ${JSON.stringify(errors)}`);
+      const data = error.response.data as ApiError;
+      if (data.errors) {
+        const messages = Object.entries(data.errors)
+          .map(([field, errs]) => `${field}: ${errs.join(", ")}`)
+          .join("; ");
+        throw new Error(`Failed to create faction: ${messages}`);
       }
-      throw new Error("Failed to create faction");
+      throw new Error(data.message || "Failed to create faction");
     }
     throw error;
   }
 }
 
-export async function updateFaction(id: string, data: Record<string, unknown>): Promise<Faction> {
+export async function updateFaction(
+  factionId: string,
+  factionData: Record<string, unknown>
+): Promise<Faction> {
   const token = getToken();
   if (!token) {
     throw new Error("Not authenticated. Run 'chiwar login' first.");
@@ -562,26 +571,26 @@ export async function updateFaction(id: string, data: Record<string, unknown>): 
   const client = createClient(token);
 
   try {
-    const response = await client.patch(`/api/v2/factions/${id}`, {
-      faction: data,
+    const response = await client.patch(`/api/v2/factions/${factionId}`, {
+      faction: factionData,
     });
     return response.data;
   } catch (error) {
     if (error instanceof AxiosError && error.response) {
-      if (error.response.status === 404) {
-        throw new Error(`Faction not found: ${id}`);
+      const data = error.response.data as ApiError;
+      if (data.errors) {
+        const messages = Object.entries(data.errors)
+          .map(([field, errs]) => `${field}: ${errs.join(", ")}`)
+          .join("; ");
+        throw new Error(`Failed to update faction: ${messages}`);
       }
-      const errors = error.response.data?.errors;
-      if (errors) {
-        throw new Error(`Failed to update faction: ${JSON.stringify(errors)}`);
-      }
-      throw new Error("Failed to update faction");
+      throw new Error(data.message || "Failed to update faction");
     }
     throw error;
   }
 }
 
-export async function deleteFaction(id: string): Promise<void> {
+export async function deleteFaction(factionId: string): Promise<void> {
   const token = getToken();
   if (!token) {
     throw new Error("Not authenticated. Run 'chiwar login' first.");
@@ -590,11 +599,11 @@ export async function deleteFaction(id: string): Promise<void> {
   const client = createClient(token);
 
   try {
-    await client.delete(`/api/v2/factions/${id}`);
+    await client.delete(`/api/v2/factions/${factionId}`);
   } catch (error) {
     if (error instanceof AxiosError && error.response) {
       if (error.response.status === 404) {
-        throw new Error(`Faction not found: ${id}`);
+        throw new Error(`Faction not found: ${factionId}`);
       }
       throw new Error("Failed to delete faction");
     }
@@ -2472,75 +2481,6 @@ export async function fetchSessionById(pageId: string): Promise<SessionNotesResp
 }
 
 // =============================================================================
-// Adventure API (Notion)
-// =============================================================================
-
-export interface AdventurePage {
-  id: string;
-  title: string;
-}
-
-export interface AdventureResponse {
-  title: string;
-  page_id: string;
-  content: string;
-  pages?: AdventurePage[];
-}
-
-/**
- * Fetch adventure from Notion by search query.
- * Searches for pages matching the query (e.g., "Chicago On Fire", "Tesla").
- */
-export async function fetchAdventure(query: string): Promise<AdventureResponse> {
-  const token = getToken();
-  if (!token) {
-    throw new Error("Not authenticated. Run 'chiwar login' first.");
-  }
-
-  const client = createClient(token);
-
-  try {
-    const response = await client.get(`/api/v2/notion/adventures?q=${encodeURIComponent(query)}`);
-    return response.data;
-  } catch (error) {
-    if (error instanceof AxiosError && error.response) {
-      if (error.response.status === 404) {
-        throw new Error(`No adventure found matching '${query}'`);
-      }
-      const data = error.response.data as ApiError;
-      throw new Error(data.error || data.message || "Failed to fetch adventure");
-    }
-    throw error;
-  }
-}
-
-/**
- * Fetch a specific adventure page by ID.
- */
-export async function fetchAdventureById(pageId: string): Promise<AdventureResponse> {
-  const token = getToken();
-  if (!token) {
-    throw new Error("Not authenticated. Run 'chiwar login' first.");
-  }
-
-  const client = createClient(token);
-
-  try {
-    const response = await client.get(`/api/v2/notion/adventures?id=${encodeURIComponent(pageId)}`);
-    return response.data;
-  } catch (error) {
-    if (error instanceof AxiosError && error.response) {
-      if (error.response.status === 404) {
-        throw new Error("Adventure not found");
-      }
-      const data = error.response.data as ApiError;
-      throw new Error(data.error || data.message || "Failed to fetch adventure");
-    }
-    throw error;
-  }
-}
-
-// =============================================================================
 // Notion Search API
 // =============================================================================
 
@@ -2616,6 +2556,68 @@ export async function sendNotification(
     if (error instanceof AxiosError && error.response) {
       const data = error.response.data as ApiError;
       throw new Error(data.error || data.message || "Failed to send notification");
+    }
+    throw error;
+  }
+}
+
+// =============================================================================
+// Adventure API (Notion)
+// =============================================================================
+
+export interface AdventurePage {
+  id: string;
+  title: string;
+}
+
+export interface AdventureResponse {
+  title: string;
+  page_id: string;
+  content: string;
+  pages?: AdventurePage[];
+}
+
+export async function fetchAdventure(query: string): Promise<AdventureResponse> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.get(`/api/v2/notion/adventures?q=${encodeURIComponent(query)}`);
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error(`No adventure found matching '${query}'`);
+      }
+      const data = error.response.data as ApiError;
+      throw new Error(data.error || data.message || "Failed to fetch adventure");
+    }
+    throw error;
+  }
+}
+
+export async function fetchAdventureById(pageId: string): Promise<AdventureResponse> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.get(`/api/v2/notion/adventures?id=${encodeURIComponent(pageId)}`);
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error("Adventure not found");
+      }
+      const data = error.response.data as ApiError;
+      throw new Error(data.error || data.message || "Failed to fetch adventure");
     }
     throw error;
   }
