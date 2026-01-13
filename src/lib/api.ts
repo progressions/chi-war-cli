@@ -2560,3 +2560,65 @@ export async function sendNotification(
     throw error;
   }
 }
+
+// =============================================================================
+// Adventure API (Notion)
+// =============================================================================
+
+export interface AdventurePage {
+  id: string;
+  title: string;
+}
+
+export interface AdventureResponse {
+  title: string;
+  page_id: string;
+  content: string;
+  pages?: AdventurePage[];
+}
+
+export async function fetchAdventure(query: string): Promise<AdventureResponse> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.get(`/api/v2/notion/adventures?q=${encodeURIComponent(query)}`);
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error(`No adventure found matching '${query}'`);
+      }
+      const data = error.response.data as ApiError;
+      throw new Error(data.error || data.message || "Failed to fetch adventure");
+    }
+    throw error;
+  }
+}
+
+export async function fetchAdventureById(pageId: string): Promise<AdventureResponse> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.get(`/api/v2/notion/adventures?id=${encodeURIComponent(pageId)}`);
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error("Adventure not found");
+      }
+      const data = error.response.data as ApiError;
+      throw new Error(data.error || data.message || "Failed to fetch adventure");
+    }
+    throw error;
+  }
+}
