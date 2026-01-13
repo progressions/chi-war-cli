@@ -454,6 +454,7 @@ export interface Faction {
   name: string;
   description?: string;
   campaign_id: string;
+  at_a_glance?: boolean;
 }
 
 export async function listFactions(): Promise<Faction[]> {
@@ -504,6 +505,110 @@ export async function searchFaction(query: string): Promise<Faction | null> {
   // Try contains match
   match = factions.find(f => f.name.toLowerCase().includes(lowerQuery));
   return match || null;
+}
+
+export async function getFaction(factionId: string): Promise<Faction> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.get(`/api/v2/factions/${factionId}`);
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error(`Faction not found: ${factionId}`);
+      }
+      throw new Error("Failed to get faction");
+    }
+    throw error;
+  }
+}
+
+export async function createFaction(
+  factionData: Record<string, unknown>
+): Promise<Faction> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.post("/api/v2/factions", {
+      faction: factionData,
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      const data = error.response.data as ApiError;
+      if (data.errors) {
+        const messages = Object.entries(data.errors)
+          .map(([field, errs]) => `${field}: ${errs.join(", ")}`)
+          .join("; ");
+        throw new Error(`Failed to create faction: ${messages}`);
+      }
+      throw new Error(data.message || "Failed to create faction");
+    }
+    throw error;
+  }
+}
+
+export async function updateFaction(
+  factionId: string,
+  factionData: Record<string, unknown>
+): Promise<Faction> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.patch(`/api/v2/factions/${factionId}`, {
+      faction: factionData,
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      const data = error.response.data as ApiError;
+      if (data.errors) {
+        const messages = Object.entries(data.errors)
+          .map(([field, errs]) => `${field}: ${errs.join(", ")}`)
+          .join("; ");
+        throw new Error(`Failed to update faction: ${messages}`);
+      }
+      throw new Error(data.message || "Failed to update faction");
+    }
+    throw error;
+  }
+}
+
+export async function deleteFaction(factionId: string): Promise<void> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    await client.delete(`/api/v2/factions/${factionId}`);
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error(`Faction not found: ${factionId}`);
+      }
+      throw new Error("Failed to delete faction");
+    }
+    throw error;
+  }
 }
 
 // CLI Browser Auth Flow

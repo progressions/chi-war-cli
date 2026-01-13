@@ -136,9 +136,13 @@ When creating or updating characters:
     "Toughness": 6,
     "Speed": 6,
     "MainAttack": "Guns"
-  }
+  },
+  "at_a_glance": true
 }
 ```
+
+### Common Fields
+- `at_a_glance` (boolean): If true, entity appears on dashboard/summary views. Available for all entities (Character, Vehicle, Faction, etc.)
 
 ### Character Types
 - `PC` - Player Character

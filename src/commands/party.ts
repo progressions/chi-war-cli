@@ -77,12 +77,13 @@ export function registerPartyCommands(program: Command): void {
   party
     .command("create")
     .description("Create a new party")
-    .argument("<name>", "Party name")
+    .argument("[json]", "Inline JSON or Name")
+    .option("-n, --name <name>", "Party name")
     .option("-d, --description <text>", "Party description")
     .option("--faction <name>", "Assign to faction (by name, fuzzy match)")
     .option("-f, --file <path>", "Read party JSON from file (overrides other options)")
     .option("--json", "Output as JSON")
-    .action(async (name, options) => {
+    .action(async (jsonArg, options) => {
       try {
         const campaignId = getCurrentCampaignId();
         if (!campaignId) {
@@ -96,11 +97,24 @@ export function registerPartyCommands(program: Command): void {
           // Read from file
           const fileContent = fs.readFileSync(options.file, "utf-8");
           partyData = JSON.parse(fileContent);
+        } else if (jsonArg) {
+          // Try parsing as JSON, fallback to treating as name
+          try {
+            partyData = JSON.parse(jsonArg);
+          } catch {
+            partyData = { name: jsonArg };
+          }
+        } else if (options.name) {
+          partyData = { name: options.name };
         } else {
-          // Build from arguments
-          partyData = { name };
-          if (options.description) partyData.description = options.description;
+          error("Provide party JSON, name, or file");
+          process.exit(1);
         }
+
+        if (options.description) partyData.description = options.description;
+
+        // ... rest of logic
+
 
         // Handle faction lookup if specified
         if (options.faction) {
@@ -139,12 +153,13 @@ export function registerPartyCommands(program: Command): void {
     .command("update")
     .description("Update an existing party")
     .argument("<id>", "Party ID to update")
+    .argument("[json]", "Inline JSON")
     .option("-n, --name <name>", "New party name")
     .option("-d, --description <text>", "New description")
     .option("--faction <name>", "Assign to faction (by name, fuzzy match)")
     .option("-f, --file <path>", "Read party JSON from file (overrides other options)")
     .option("--json", "Output as JSON")
-    .action(async (id, options) => {
+    .action(async (id, jsonArg, options) => {
       try {
         let partyData: Record<string, unknown>;
 
@@ -152,12 +167,14 @@ export function registerPartyCommands(program: Command): void {
           // Read from file
           const fileContent = fs.readFileSync(options.file, "utf-8");
           partyData = JSON.parse(fileContent);
+        } else if (jsonArg) {
+          partyData = JSON.parse(jsonArg);
         } else {
-          // Build from arguments
           partyData = {};
-          if (options.name) partyData.name = options.name;
-          if (options.description) partyData.description = options.description;
         }
+
+        if (options.name) partyData.name = options.name;
+        if (options.description) partyData.description = options.description;
 
         // Handle faction lookup if specified
         if (options.faction) {

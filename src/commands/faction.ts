@@ -1,18 +1,35 @@
 import { Command } from "commander";
-import { listFactions, searchFaction } from "../lib/api.js";
+import {
+  listFactions,
+  searchFaction,
+  getFaction,
+  createFaction,
+  updateFaction,
+  deleteFaction,
+  type Faction
+} from "../lib/api.js";
 import { success, error, info } from "../lib/output.js";
+import * as fs from "fs";
+// Removed import type { Faction } from "../types/index.js";
 
 export function registerFactionCommands(program: Command): void {
   const faction = program
     .command("faction")
     .description("Manage factions");
 
+  // LIST
   faction
     .command("list")
     .description("List all factions in the current campaign")
-    .action(async () => {
+    .option("--json", "Output as JSON")
+    .action(async (options) => {
       try {
         const factions = await listFactions();
+
+        if (options.json) {
+          console.log(JSON.stringify(factions, null, 2));
+          return;
+        }
 
         if (factions.length === 0) {
           info("No factions found in current campaign");
@@ -21,12 +38,7 @@ export function registerFactionCommands(program: Command): void {
 
         console.log(`\nFactions (${factions.length}):\n`);
         for (const f of factions) {
-          console.log(`  ${f.name}`);
-          console.log(`    ID: ${f.id}`);
-          if (f.description) {
-            console.log(`    ${f.description}`);
-          }
-          console.log();
+          printFactionSummary(f);
         }
       } catch (err) {
         error(err instanceof Error ? err.message : "Failed to list factions");
@@ -34,11 +46,13 @@ export function registerFactionCommands(program: Command): void {
       }
     });
 
+  // SEARCH
   faction
     .command("search")
     .description("Search for a faction by name")
     .argument("<query>", "Faction name to search for")
-    .action(async (query) => {
+    .option("--json", "Output as JSON")
+    .action(async (query, options) => {
       try {
         const match = await searchFaction(query);
 
@@ -48,14 +62,169 @@ export function registerFactionCommands(program: Command): void {
           process.exit(1);
         }
 
-        success(`Found: ${match.name}`);
-        console.log(`  ID: ${match.id}`);
-        if (match.description) {
-          console.log(`  Description: ${match.description}`);
+        if (options.json) {
+          console.log(JSON.stringify(match, null, 2));
+          return;
         }
+
+        success(`Found: ${match.name}`);
+        printFactionDetails(match);
       } catch (err) {
         error(err instanceof Error ? err.message : "Failed to search factions");
         process.exit(1);
       }
     });
+
+  // SHOW
+  faction
+    .command("show <id>")
+    .description("Show faction details")
+    .option("--json", "Output as JSON")
+    .action(async (id, options) => {
+      try {
+        const item = await getFaction(id);
+
+        if (options.json) {
+          console.log(JSON.stringify(item, null, 2));
+          return;
+        }
+
+        printFactionDetails(item);
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to get faction");
+        process.exit(1);
+      }
+    });
+
+  // CREATE
+  faction
+    .command("create")
+    .description("Create a new faction")
+    .argument("[json]", "Inline JSON")
+    .option("-f, --file <path>", "Read from JSON file")
+    .option("-n, --name <name>", "Faction name (shorthand)")
+    .action(async (jsonArg, options) => {
+      try {
+        let data: Record<string, unknown>;
+
+        if (options.file) {
+          data = JSON.parse(fs.readFileSync(options.file, "utf-8"));
+        } else if (jsonArg) {
+          data = JSON.parse(jsonArg);
+        } else if (options.name) {
+          data = { name: options.name };
+        } else {
+          error("Provide JSON as argument, use --file, or use --name");
+          console.log("\nUsage:");
+          console.log("  chiwar faction create --name \"Ascended\"");
+          console.log("  chiwar faction create --file faction.json");
+          console.log('  chiwar faction create \'{\"name\": \"Lotus\", \"description\": \"Eunuch sorcerers\"}\'');
+          process.exit(1);
+        }
+
+        const created = await createFaction(data);
+        success(`Created faction: ${created.name}`);
+        console.log(`  ID: ${created.id}`);
+      } catch (err) {
+        if (err instanceof SyntaxError) {
+          error("Invalid JSON: " + err.message);
+        } else {
+          error(err instanceof Error ? err.message : "Failed to create faction");
+        }
+        process.exit(1);
+      }
+    });
+
+  // UPDATE
+  faction
+    .command("update <id>")
+    .description("Update a faction")
+    .argument("[json]", "Inline JSON")
+    .option("-f, --file <path>", "Read from JSON file")
+    .option("-n, --name <name>", "Update faction name")
+    .action(async (id, jsonArg, options) => {
+      try {
+        let data: Record<string, unknown>;
+
+        if (options.file) {
+          data = JSON.parse(fs.readFileSync(options.file, "utf-8"));
+        } else if (jsonArg) {
+          data = JSON.parse(jsonArg);
+        } else if (options.name) {
+          data = { name: options.name };
+        } else {
+          error("Provide JSON as argument, use --file, or use --name");
+          process.exit(1);
+        }
+
+        const updated = await updateFaction(id, data);
+        success(`Updated faction: ${updated.name}`);
+      } catch (err) {
+        if (err instanceof SyntaxError) {
+          error("Invalid JSON: " + err.message);
+        } else {
+          error(err instanceof Error ? err.message : "Failed to update faction");
+        }
+        process.exit(1);
+      }
+    });
+
+  // DELETE
+  faction
+    .command("delete <id>")
+    .description("Delete a faction")
+    .option("-y, --yes", "Skip confirmation")
+    .action(async (id, options) => {
+      try {
+        const item = await getFaction(id);
+
+        if (!options.yes) {
+          const inquirer = await import("inquirer");
+          const { confirm } = await inquirer.default.prompt([
+            {
+              type: "confirm",
+              name: "confirm",
+              message: `Delete faction "${item.name}"? This cannot be undone.`, 
+              default: false,
+            },
+          ]);
+          if (!confirm) {
+            info("Cancelled");
+            return;
+          }
+        }
+
+        await deleteFaction(id);
+        success(`Deleted faction: ${item.name}`);
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to delete faction");
+        process.exit(1);
+      }
+    });
+}
+
+function printFactionSummary(f: Faction): void {
+  console.log(`  ${f.name}`);
+  console.log(`    ID: ${f.id}`);
+  if (f.description) {
+    console.log(`    ${f.description}`);
+  }
+  console.log();
+}
+
+function printFactionDetails(f: Faction): void {
+  console.log(`\n${f.name}`);
+  console.log("=".repeat(f.name.length));
+  console.log(`  ID: ${f.id}`);
+  
+  if (f.description) {
+    console.log(`  Description: ${f.description}`);
+  }
+
+  if (f.at_a_glance !== undefined) {
+    console.log(`  At a Glance: ${f.at_a_glance}`);
+  }
+  
+  console.log(`  Campaign ID: ${f.campaign_id}`);
+  console.log("");
 }
