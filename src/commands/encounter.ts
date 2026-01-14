@@ -8,6 +8,7 @@ import {
   updateFight,
   updateInitiatives,
   updateShotLocation,
+  getWeapon,
 } from "../lib/api.js";
 import { success, error, info, warn } from "../lib/output.js";
 import { getCurrentEncounterId, setCurrentEncounterId } from "../lib/config.js";
@@ -53,6 +54,7 @@ function extractCombatants(encounter: Encounter): Combatant[] {
         mainAttack,
         attackValue,
         damage: actionValues.Damage as number | undefined,
+        equippedWeaponId: char.equipped_weapon_id,
         location: char.location,
       });
     }
@@ -494,8 +496,29 @@ export function registerEncounterCommands(program: Command): void {
 
         const targetCount = parseInt(options.count, 10) || 1;
 
+        // Resolve attacker damage:
+        // 1. If equipped weapon exists, use weapon's damage
+        // 2. If no weapon, use action_values.Damage (for NPCs/creatures)
+        // 3. Default to 7 (unarmed damage)
+        let resolvedDamage = 7; // Default unarmed damage
+        if (attackerMatch.equippedWeaponId) {
+          try {
+            const weapon = await getWeapon(attackerMatch.equippedWeaponId);
+            resolvedDamage = weapon.damage ?? 7;
+          } catch {
+            // Weapon not found, fall back to default
+            resolvedDamage = 7;
+          }
+        } else if (attackerMatch.damage !== undefined && attackerMatch.damage > 0) {
+          // Use action_values.Damage for NPCs/creatures with innate damage
+          resolvedDamage = attackerMatch.damage;
+        }
+
+        // Create attacker copy with resolved damage
+        const attackerWithDamage = { ...attackerMatch, damage: resolvedDamage };
+
         // Calculate attack result
-        const result = calculateAttack(attackerMatch, targetMatch, swerve, targetCount);
+        const result = calculateAttack(attackerWithDamage, targetMatch, swerve, targetCount);
 
         // Display result
         console.log("");
