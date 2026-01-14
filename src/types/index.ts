@@ -172,6 +172,7 @@ export interface Fight {
   description?: string;
   active: boolean;
   ended: boolean;
+  ended_at?: string | null;
   sequence: number;
   campaign_id: string;
   site_id?: string;
