@@ -1122,12 +1122,18 @@ export function registerEncounterCommands(program: Command): void {
 
         const enc = await getEncounter(encounterId);
 
-        // Make sure fight is started
+        // Increment sequence for the new round
+        const newSequence = enc.sequence + 1;
         if (enc.sequence === 0) {
-          info("Starting fight first...");
+          info(`Starting fight (Sequence ${newSequence})...`);
           await updateFight(encounterId, {
-            sequence: 1,
+            sequence: newSequence,
             started_at: new Date().toISOString()
+          });
+        } else {
+          info(`Advancing to Sequence ${newSequence}...`);
+          await updateFight(encounterId, {
+            sequence: newSequence
           });
         }
 
@@ -1193,7 +1199,7 @@ export function registerEncounterCommands(program: Command): void {
         );
 
         console.log("");
-        success(`Initiative rolled for ${combatants.length} combatants!`);
+        success(`Sequence ${newSequence}: Initiative rolled for ${combatants.length} combatants!`);
       } catch (err) {
         error(err instanceof Error ? err.message : "Failed to roll initiative");
         process.exit(1);
