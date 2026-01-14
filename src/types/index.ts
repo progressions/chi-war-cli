@@ -493,6 +493,7 @@ export interface Combatant {
   mainAttack?: string;
   attackValue?: number;
   damage?: number;
+  equippedWeaponId?: string; // ID of equipped weapon for damage lookup
   location?: string; // Current location in fight
 }
 
