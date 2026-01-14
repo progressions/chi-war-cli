@@ -52,6 +52,12 @@ Config is stored at `~/.chiwar/config.json`.
 
 ## Commands
 
+### Dashboard
+
+```bash
+chiwar dashboard                  # Show campaign summary, next adventure, and fights
+```
+
 ### Campaigns
 
 ```bash

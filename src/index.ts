@@ -17,6 +17,7 @@ import { registerAiCommands } from "./commands/ai.js";
 import { registerSessionCommands } from "./commands/session.js";
 import { registerAdventureCommands } from "./commands/adventure.js";
 import { registerNotionCommands } from "./commands/notion.js";
+import { registerDashboardCommands } from "./commands/dashboard.js";
 import { registerEncounterCommands } from "./commands/encounter.js";
 import { registerNotificationCommands } from "./commands/notification.js";
 
@@ -38,6 +39,9 @@ program
   .command("logout")
   .description("Clear saved authentication")
   .action(logoutCommand);
+
+// Dashboard command
+registerDashboardCommands(program);
 
 // Campaign commands
 registerCampaignCommands(program);
