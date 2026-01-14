@@ -77,11 +77,13 @@ export function registerDashboardCommands(program: Command): void {
           info("No upcoming session notes found.");
         }
 
-        // 4. Fetch Fights
+        // 4. Fetch Fights (filter out ended fights)
         const fightResult = await listFights({ active: true });
-        if (fightResult.fights.length > 0) {
+        // Filter out fights that have ended (ended_at is set)
+        const activeFights = fightResult.fights.filter(f => !f.ended_at);
+        if (activeFights.length > 0) {
           heading("Active/Upcoming Fights");
-          for (const fight of fightResult.fights) {
+          for (const fight of activeFights) {
             console.log(`  - ${fight.name} (ID: ${fight.id})`);
             if (fight.description) {
               // Strip HTML tags
