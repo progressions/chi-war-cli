@@ -16,6 +16,8 @@ import {
   formatAttackResult,
   calculateWoundResult,
   formatWoundResult,
+  calculateMultiTargetAttack,
+  formatMultiTargetAttackResult,
 } from "../lib/combat.js";
 import type {
   Encounter,
@@ -617,6 +619,229 @@ export function registerEncounterCommands(program: Command): void {
         }
       } catch (err) {
         error(err instanceof Error ? err.message : "Failed to execute attack");
+        process.exit(1);
+      }
+    });
+
+  // MULTIATTACK - Attack multiple targets with damage splitting (Feng Shui 2 rules)
+  encounter
+    .command("multiattack <attacker>")
+    .description("Attack multiple targets with split damage (Feng Shui 2 multi-target rules)")
+    .requiredOption("-t, --target <names...>", "Target character names (can specify multiple)")
+    .option("-r, --roll <swerve>", "Use provided swerve value instead of rolling")
+    .option("-d, --damage <allocation>", "Custom damage allocation (comma-separated, must sum to total damage)")
+    .action(async (attackerName, options) => {
+      try {
+        const encounterId = getCurrentEncounterId();
+        if (!encounterId) {
+          error("No encounter set. Use 'encounter set <fight-id>' first.");
+          process.exit(1);
+        }
+
+        // Get encounter and find combatants
+        const enc = await getEncounter(encounterId);
+        const combatants = extractCombatants(enc);
+
+        // Find attacker
+        const attackerMatch = findCombatant(attackerName, combatants);
+        if (!attackerMatch) {
+          error(`No combatant found matching "${attackerName}"`);
+          listCombatantNames(combatants);
+          process.exit(1);
+        }
+        if (Array.isArray(attackerMatch)) {
+          error(`Ambiguous attacker "${attackerName}". Did you mean:`);
+          for (const c of attackerMatch) {
+            console.log(`  ${c.name}`);
+          }
+          process.exit(1);
+        }
+
+        // Parse target names - handle both array format and comma-separated
+        let targetNames: string[] = [];
+        if (Array.isArray(options.target)) {
+          // Handle: -t name1 -t name2 or -t "name1" -t "name2"
+          for (const t of options.target) {
+            // Also split by comma in case user did -t "name1,name2"
+            targetNames.push(...t.split(",").map((s: string) => s.trim()).filter((s: string) => s));
+          }
+        }
+
+        if (targetNames.length < 2) {
+          error("Multi-target attack requires at least 2 targets. Use 'attack' for single targets.");
+          process.exit(1);
+        }
+
+        // Find all targets
+        const targets: Combatant[] = [];
+        for (const targetName of targetNames) {
+          const targetMatch = findCombatant(targetName, combatants);
+          if (!targetMatch) {
+            error(`No combatant found matching "${targetName}"`);
+            listCombatantNames(combatants);
+            process.exit(1);
+          }
+          if (Array.isArray(targetMatch)) {
+            error(`Ambiguous target "${targetName}". Did you mean:`);
+            for (const c of targetMatch) {
+              console.log(`  ${c.name}`);
+            }
+            process.exit(1);
+          }
+          targets.push(targetMatch);
+        }
+
+        // Get or roll swerve
+        let swerve: SwerveResult;
+        if (options.roll !== undefined) {
+          const providedSwerve = parseInt(options.roll, 10);
+          if (isNaN(providedSwerve)) {
+            error("Invalid swerve value. Must be a number.");
+            process.exit(1);
+          }
+          swerve = {
+            positives: { sum: Math.max(0, providedSwerve), rolls: [Math.max(0, providedSwerve)] },
+            negatives: { sum: Math.max(0, -providedSwerve), rolls: [Math.max(0, -providedSwerve)] },
+            total: providedSwerve,
+            boxcars: false,
+          };
+        } else {
+          swerve = await rollSwerve();
+        }
+
+        // Parse custom damage allocation if provided
+        let customDamageAllocation: number[] | undefined;
+        if (options.damage) {
+          const parsed = options.damage.split(",").map((s: string) => parseInt(s.trim(), 10));
+          if (parsed.some(isNaN)) {
+            error("Invalid damage allocation. Must be comma-separated numbers.");
+            process.exit(1);
+          }
+          if (parsed.length !== targets.length) {
+            error(`Damage allocation count (${parsed.length}) must match target count (${targets.length}).`);
+            process.exit(1);
+          }
+          customDamageAllocation = parsed;
+        }
+
+        // Calculate multi-target attack result
+        const result = calculateMultiTargetAttack(attackerMatch, targets, swerve, customDamageAllocation);
+
+        // Display result
+        console.log("");
+        for (const line of formatMultiTargetAttackResult(result)) {
+          console.log(line);
+        }
+
+        // Build updates for each target
+        const updates: CombatUpdate[] = [];
+
+        for (let i = 0; i < result.results.length; i++) {
+          const r = result.results[i];
+          const target = targets[i];
+
+          // Build event details
+          const eventDetails: Record<string, unknown> = {
+            attacker_id: attackerMatch.id,
+            attacker_name: attackerMatch.name,
+            target_id: target.id,
+            target_name: target.name,
+            swerve: swerve.total,
+            attack_total: result.attackRoll,
+            defense: r.defense,
+            outcome: r.outcome,
+            hit: r.hit,
+            multi_target: true,
+            target_count: result.targetCount,
+            allocated_damage: r.allocatedDamage,
+          };
+
+          if (r.hit) {
+            eventDetails.smackdown = r.smackdown;
+            eventDetails.wounds_dealt = r.woundsDealt;
+            if (r.targetIsMook) {
+              eventDetails.mooks_dropped = r.mooksDropped;
+            }
+          }
+
+          const eventDescription = r.hit
+            ? `${attackerMatch.name} attacks ${target.name} (multi-target ${i + 1}/${result.targetCount}) - HIT for ${r.targetIsMook ? `${r.mooksDropped} mooks dropped` : `${r.woundsDealt} wounds`}`
+            : `${attackerMatch.name} attacks ${target.name} (multi-target ${i + 1}/${result.targetCount}) - MISS`;
+
+          if (r.hit) {
+            if (r.targetIsMook && r.mooksDropped) {
+              const newCount = Math.max(0, (target.count || 0) - r.mooksDropped);
+              updates.push({
+                shot_id: target.shotId,
+                character_id: target.id,
+                count: newCount,
+                event: {
+                  event_type: "attack",
+                  description: eventDescription,
+                  details: eventDetails,
+                },
+              });
+            } else if (r.woundsDealt > 0) {
+              const isPC = target.characterType === "PC";
+              const charInEnc = enc.shots
+                .flatMap((s) => s.characters)
+                .find((c) => c.id === target.id);
+              const currentWounds = isPC
+                ? (charInEnc?.action_values?.Wounds as number) || 0
+                : (charInEnc?.count as number) || 0;
+              const newWounds = currentWounds + r.woundsDealt;
+
+              const update: CombatUpdate = {
+                shot_id: target.shotId,
+                character_id: target.id,
+                event: {
+                  event_type: "attack",
+                  description: eventDescription,
+                  details: eventDetails,
+                },
+              };
+
+              if (isPC) {
+                update.action_values = { Wounds: newWounds };
+              } else {
+                update.wounds = r.woundsDealt;
+              }
+
+              updates.push(update);
+            } else {
+              // Hit but 0 wounds
+              updates.push({
+                shot_id: target.shotId,
+                character_id: target.id,
+                event: {
+                  event_type: "attack",
+                  description: `${attackerMatch.name} attacks ${target.name} (multi-target) - HIT but 0 wounds (blocked by toughness)`,
+                  details: eventDetails,
+                },
+              });
+            }
+          } else {
+            // Miss - record event on attacker for first miss only (to avoid duplicate entries)
+            if (i === 0 || !result.results.slice(0, i).some(prev => !prev.hit)) {
+              updates.push({
+                shot_id: target.shotId,
+                character_id: target.id,
+                event: {
+                  event_type: "attack",
+                  description: eventDescription,
+                  details: eventDetails,
+                },
+              });
+            }
+          }
+        }
+
+        if (updates.length > 0) {
+          await applyCombatAction(encounterId, updates);
+          success("Multi-target combat action applied");
+        }
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to execute multi-target attack");
         process.exit(1);
       }
     });
