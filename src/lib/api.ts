@@ -2622,3 +2622,177 @@ export async function fetchAdventureById(pageId: string): Promise<AdventureRespo
     throw error;
   }
 }
+
+// =============================================================================
+// Advancement API
+// =============================================================================
+
+import type { Advancement, AdvancementListResponse } from "../types/index.js";
+
+export interface ListAdvancementsOptions {
+  limit?: number;
+  page?: number;
+}
+
+export async function listAdvancements(
+  characterId: string,
+  options: ListAdvancementsOptions = {}
+): Promise<AdvancementListResponse> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  const params = new URLSearchParams();
+  if (options.limit) params.append("per_page", options.limit.toString());
+  if (options.page) params.append("page", options.page.toString());
+
+  try {
+    const queryString = params.toString();
+    const url = `/api/v2/characters/${characterId}/advancements${queryString ? `?${queryString}` : ""}`;
+    const response = await client.get(url);
+    // API returns array directly (not wrapped in {advancements: [...]} like other endpoints)
+    const advancements = Array.isArray(response.data) ? response.data : (response.data.advancements || []);
+    return {
+      advancements,
+      meta: response.data.meta || { current_page: 1, total_pages: 1, total_count: advancements.length, per_page: 25 },
+    };
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error(`Character not found: ${characterId}`);
+      }
+      throw new Error("Failed to list advancements");
+    }
+    throw error;
+  }
+}
+
+export async function getAdvancement(
+  characterId: string,
+  advancementId: string
+): Promise<Advancement> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.get(`/api/v2/characters/${characterId}/advancements/${advancementId}`);
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error("Advancement or character not found");
+      }
+      throw new Error("Failed to get advancement");
+    }
+    throw error;
+  }
+}
+
+export async function createAdvancement(
+  characterId: string,
+  advancementData: { description?: string }
+): Promise<Advancement> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.post(`/api/v2/characters/${characterId}/advancements`, {
+      advancement: advancementData,
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error(`Character not found: ${characterId}`);
+      }
+      if (error.response.status === 403) {
+        throw new Error("Not authorized to create advancements for this character");
+      }
+      const data = error.response.data as ApiError;
+      if (data.errors) {
+        const messages = Object.entries(data.errors)
+          .map(([field, errs]) => `${field}: ${errs.join(", ")}`)
+          .join("; ");
+        throw new Error(`Failed to create advancement: ${messages}`);
+      }
+      throw new Error(data.message || "Failed to create advancement");
+    }
+    throw error;
+  }
+}
+
+export async function updateAdvancement(
+  characterId: string,
+  advancementId: string,
+  advancementData: { description?: string }
+): Promise<Advancement> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.patch(`/api/v2/characters/${characterId}/advancements/${advancementId}`, {
+      advancement: advancementData,
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error("Advancement or character not found");
+      }
+      if (error.response.status === 403) {
+        throw new Error("Not authorized to update this advancement");
+      }
+      const data = error.response.data as ApiError;
+      if (data.errors) {
+        const messages = Object.entries(data.errors)
+          .map(([field, errs]) => `${field}: ${errs.join(", ")}`)
+          .join("; ");
+        throw new Error(`Failed to update advancement: ${messages}`);
+      }
+      throw new Error(data.message || "Failed to update advancement");
+    }
+    throw error;
+  }
+}
+
+export async function deleteAdvancement(
+  characterId: string,
+  advancementId: string
+): Promise<void> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    await client.delete(`/api/v2/characters/${characterId}/advancements/${advancementId}`);
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error("Advancement or character not found");
+      }
+      if (error.response.status === 403) {
+        throw new Error("Not authorized to delete this advancement");
+      }
+      throw new Error("Failed to delete advancement");
+    }
+    throw error;
+  }
+}
