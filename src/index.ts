@@ -20,6 +20,7 @@ import { registerNotionCommands } from "./commands/notion.js";
 import { registerDashboardCommands } from "./commands/dashboard.js";
 import { registerEncounterCommands } from "./commands/encounter.js";
 import { registerNotificationCommands } from "./commands/notification.js";
+import { registerAdvancementCommands } from "./commands/advancement.js";
 
 const program = new Command();
 
@@ -48,6 +49,9 @@ registerCampaignCommands(program);
 
 // Character commands
 registerCharacterCommands(program);
+
+// Advancement commands (character progression)
+registerAdvancementCommands(program);
 
 // Config commands
 registerConfigCommands(program);

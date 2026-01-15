@@ -500,3 +500,17 @@ export interface Combatant {
 
 // Re-export CombatUpdate from api.ts
 export type { CombatUpdate } from "../lib/api.js";
+
+// Advancement types
+export interface Advancement {
+  id: string;
+  description: string;
+  character_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdvancementListResponse {
+  advancements: Advancement[];
+  meta: PaginationMeta;
+}
