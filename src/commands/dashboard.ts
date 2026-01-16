@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { getCampaign, listFights, searchNotionPages, fetchSessionById } from "../lib/api.js";
+import { getCampaign, listFights, searchNotionPages, fetchSessionById, fetchSessionNotes } from "../lib/api.js";
 import { getCurrentCampaignId } from "../lib/config.js";
 import { success, error, info, heading } from "../lib/output.js";
 
@@ -20,60 +20,60 @@ export function registerDashboardCommands(program: Command): void {
         success(`Dashboard for Campaign: ${campaign.name}`);
 
         // 2. Fetch Latest Report
-        const reports = await searchNotionPages("Report - Session");
-        const latestReport = reports
-          .filter(p => {
-            const title = p.title || "";
-            return title.startsWith("Report - Session") && !title.includes("5-xx");
-          })
-          .sort((a, b) => (b.title || "").localeCompare(a.title || ""))[0];
+        try {
+          const reportResult = await fetchSessionNotes("Report - Session");
+          const reportContent = reportResult.content || "";
 
-        if (latestReport) {
-          heading("Current State (Latest Report)");
-          const content = await fetchSessionById(latestReport.id);
-          // Just show the first few paragraphs or a summary
-          // Look for 'Session Summary' or just take the first few lines
-          let displayContent = content.content;
-          const summaryIndex = content.content.indexOf("## Session Summary");
-          if (summaryIndex !== -1) {
-             displayContent = content.content.substring(summaryIndex);
+          if (reportContent) {
+            heading("Current State (Latest Report)");
+            // Look for 'Session Summary' section
+            let displayContent = reportContent;
+            const summaryIndex = reportContent.indexOf("## Session Summary");
+            if (summaryIndex !== -1) {
+              displayContent = reportContent.substring(summaryIndex);
+            }
+
+            const lines = displayContent.split("\n");
+            const summary = lines.slice(0, 15).join("\n");
+            console.log(summary.trim() + (lines.length > 15 ? "\n..." : ""));
+
+            if (reportResult.page_id) {
+              console.log(`\nFull report: https://notion.so/${reportResult.page_id}`);
+            }
+          } else {
+            info("No session reports found.");
           }
-          
-          const lines = displayContent.split("\n");
-          const summary = lines.slice(0, 15).join("\n");
-          console.log(summary.trim() + (lines.length > 15 ? "\n..." : ""));
-          console.log(`\nFull report: ${latestReport.url}`);
-        } else {
+        } catch {
           info("No session reports found.");
         }
 
-        // 3. Fetch Next Adventure
-        const sessions = await searchNotionPages("Session");
-        // Filter out reports and template pages
-        const latestSession = sessions
-          .filter(p => {
-            const title = p.title || "";
-            return title.startsWith("Session") && !title.startsWith("Report") && !title.includes("5-xx");
-          })
-          .sort((a, b) => (b.title || "").localeCompare(a.title || ""))[0];
+        // 3. Fetch Next Adventure (Upcoming Session)
+        try {
+          const sessionResult = await fetchSessionNotes("Session");
+          const sessionContent = sessionResult.content || "";
 
-        if (latestSession) {
-          heading("Next Adventure (Upcoming Session)");
-          const content = await fetchSessionById(latestSession.id);
-          
-          // Try to find the "Session" or "Opening" section
-          let displayContent = content.content;
-          const sessionIndex = content.content.indexOf("# Session");
-          if (sessionIndex !== -1) {
-            displayContent = content.content.substring(sessionIndex);
+          if (sessionContent) {
+            heading("Next Adventure (Upcoming Session)");
+
+            // Try to find the "Session" or "Opening" section
+            let displayContent = sessionContent;
+            const sessionIndex = sessionContent.indexOf("# Session");
+            if (sessionIndex !== -1) {
+              displayContent = sessionContent.substring(sessionIndex);
+            }
+
+            const lines = displayContent.split("\n");
+            const blurb = lines.slice(0, 20).join("\n");
+
+            console.log(blurb.trim() + (displayContent.length > blurb.length ? "\n..." : ""));
+
+            if (sessionResult.page_id) {
+              console.log(`\nFull notes: https://notion.so/${sessionResult.page_id}`);
+            }
+          } else {
+            info("No upcoming session notes found.");
           }
-          
-          const lines = displayContent.split("\n");
-          const blurb = lines.slice(0, 20).join("\n");
-          
-          console.log(blurb.trim() + (displayContent.length > blurb.length ? "\n..." : ""));
-          console.log(`\nFull notes: ${latestSession.url}`);
-        } else {
+        } catch {
           info("No upcoming session notes found.");
         }
 
