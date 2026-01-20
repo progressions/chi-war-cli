@@ -28,6 +28,8 @@ import type {
   AiAttachResponse,
   MediaLibraryImage,
   MediaLibraryResponse,
+  Adventure,
+  AdventureListResponse,
   Encounter,
   SwerveResult,
   Notification,
@@ -2562,6 +2564,66 @@ export async function sendNotification(
 }
 
 // =============================================================================
+// Adventure API (Chi War database)
+// =============================================================================
+
+interface ListAdventuresOptions {
+  limit?: number;
+  page?: number;
+  active?: boolean;
+}
+
+export async function listAdventures(
+  options: ListAdventuresOptions = {}
+): Promise<AdventureListResponse> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  const params = new URLSearchParams();
+  if (options.limit) params.append("per_page", options.limit.toString());
+  if (options.page) params.append("page", options.page.toString());
+  if (options.active !== undefined) params.append("active", options.active.toString());
+
+  try {
+    const response = await client.get(`/api/v2/adventures?${params.toString()}`);
+    return {
+      adventures: response.data.adventures || [],
+      meta: response.data.meta || { current_page: 1, total_pages: 1, total_count: 0, per_page: 25 },
+    };
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      throw new Error("Failed to list adventures");
+    }
+    throw error;
+  }
+}
+
+export async function getAdventure(adventureId: string): Promise<Adventure> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.get(`/api/v2/adventures/${adventureId}`);
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error("Adventure not found");
+      }
+      throw new Error("Failed to get adventure");
+    }
+    throw error;
+  }
+}
+
 // Adventure API (Notion)
 // =============================================================================
 
