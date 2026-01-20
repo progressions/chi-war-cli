@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { createCharacterRaw, updateCharacterRaw, listCampaigns, searchFaction, listCharacters, getCharacter, deleteCharacter, getEntityNotionPage, syncToNotion, syncFromNotion } from "../lib/api.js";
+import { createCharacterRaw, updateCharacterRaw, listCampaigns, searchFaction, listCharacters, getCharacter, deleteCharacter, getEntityNotionPage, syncToNotion, syncFromNotion, getEntitySyncLogs } from "../lib/api.js";
 import { getCurrentCampaignId, setCurrentCampaignId } from "../lib/config.js";
 import { success, error, info } from "../lib/output.js";
 import inquirer from "inquirer";
@@ -333,6 +333,50 @@ export function registerCharacterCommands(program: Command): void {
         printCharacterDetails(updated);
       } catch (err) {
         error(err instanceof Error ? err.message : "Failed to sync from Notion");
+        process.exit(1);
+      }
+    });
+
+  // SYNC LOGS - Fetch Notion sync logs for debugging
+  character
+    .command("sync-logs")
+    .description("Fetch Notion sync logs for a character (for debugging)")
+    .argument("<id>", "Character ID")
+    .option("-n, --limit <number>", "Number of logs to show", "10")
+    .option("-p, --page <number>", "Page number", "1")
+    .option("--json", "Output as JSON")
+    .action(async (id, options) => {
+      try {
+        const result = await getEntitySyncLogs("characters", id, {
+          limit: parseInt(options.limit),
+          page: parseInt(options.page),
+        });
+
+        if (options.json) {
+          console.log(JSON.stringify(result, null, 2));
+          return;
+        }
+
+        if (result.notion_sync_logs.length === 0) {
+          info("No sync logs found for this character");
+          return;
+        }
+
+        console.log(`\nNotion Sync Logs (${result.meta.total_count} total):\n`);
+        for (const log of result.notion_sync_logs) {
+          console.log(`  ${log.created_at}`);
+          console.log(`    Status: ${log.status}`);
+          if (log.error_message) {
+            console.log(`    Error: ${log.error_message}`);
+          }
+          console.log("");
+        }
+
+        if (result.meta.total_pages > 1) {
+          console.log(`Page ${result.meta.current_page} of ${result.meta.total_pages}`);
+        }
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to fetch sync logs");
         process.exit(1);
       }
     });

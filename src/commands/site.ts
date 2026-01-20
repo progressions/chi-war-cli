@@ -8,6 +8,7 @@ import {
   getEntityNotionPage,
   syncToNotion,
   syncFromNotion,
+  getEntitySyncLogs,
 } from "../lib/api.js";
 import { success, error, info } from "../lib/output.js";
 import * as fs from "fs";
@@ -248,6 +249,49 @@ export function registerSiteCommands(program: Command): void {
         printSiteDetails(updated);
       } catch (err) {
         error(err instanceof Error ? err.message : "Failed to sync from Notion");
+        process.exit(1);
+      }
+    });
+
+  // SYNC LOGS - Fetch Notion sync logs for debugging
+  site
+    .command("sync-logs <id>")
+    .description("Fetch Notion sync logs for a site (for debugging)")
+    .option("-n, --limit <number>", "Number of logs to show", "10")
+    .option("-p, --page <number>", "Page number", "1")
+    .option("--json", "Output as JSON")
+    .action(async (id, options) => {
+      try {
+        const result = await getEntitySyncLogs("sites", id, {
+          limit: parseInt(options.limit),
+          page: parseInt(options.page),
+        });
+
+        if (options.json) {
+          console.log(JSON.stringify(result, null, 2));
+          return;
+        }
+
+        if (result.notion_sync_logs.length === 0) {
+          info("No sync logs found for this site");
+          return;
+        }
+
+        console.log(`\nNotion Sync Logs (${result.meta.total_count} total):\n`);
+        for (const log of result.notion_sync_logs) {
+          console.log(`  ${log.created_at}`);
+          console.log(`    Status: ${log.status}`);
+          if (log.error_message) {
+            console.log(`    Error: ${log.error_message}`);
+          }
+          console.log("");
+        }
+
+        if (result.meta.total_pages > 1) {
+          console.log(`Page ${result.meta.current_page} of ${result.meta.total_pages}`);
+        }
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to fetch sync logs");
         process.exit(1);
       }
     });
