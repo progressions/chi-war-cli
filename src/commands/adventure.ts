@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { fetchAdventure, fetchAdventureById, getEntityNotionPage, listAdventures, getAdventure } from "../lib/api.js";
+import { fetchAdventure, fetchAdventureById, getEntityNotionPage, listAdventures, getAdventure, syncToNotion, syncFromNotion } from "../lib/api.js";
 import { success, error, info } from "../lib/output.js";
 import type { Adventure } from "../types/index.js";
 
@@ -159,6 +159,52 @@ export function registerAdventureCommands(program: Command): void {
         console.log(JSON.stringify(result, null, 2));
       } catch (err) {
         error(err instanceof Error ? err.message : "Failed to fetch Notion page");
+        process.exit(1);
+      }
+    });
+
+  // SYNC TO NOTION - Push adventure data to Notion
+  adventure
+    .command("sync-to-notion")
+    .description("Sync adventure data TO Notion (creates or updates Notion page)")
+    .argument("<id>", "Adventure ID")
+    .action(async (id) => {
+      try {
+        const adv = await getAdventure(id);
+        info(`Syncing "${adv.name}" to Notion...`);
+
+        const result = await syncToNotion("adventures", id);
+        success(result.message);
+        console.log(`  Status: ${result.status}`);
+        console.log(`  Adventure: ${adv.name}`);
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to sync to Notion");
+        process.exit(1);
+      }
+    });
+
+  // SYNC FROM NOTION - Pull adventure data from Notion
+  adventure
+    .command("sync-from-notion")
+    .description("Sync adventure data FROM Notion (updates adventure with Notion page content)")
+    .argument("<id>", "Adventure ID")
+    .option("--json", "Output updated adventure as JSON")
+    .action(async (id, options) => {
+      try {
+        const adv = await getAdventure(id);
+        info(`Syncing "${adv.name}" from Notion...`);
+
+        const updated = await syncFromNotion<Adventure>("adventures", id);
+
+        if (options.json) {
+          console.log(JSON.stringify(updated, null, 2));
+          return;
+        }
+
+        success(`Adventure "${updated.name}" synced from Notion`);
+        printAdventureDetails(updated);
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to sync from Notion");
         process.exit(1);
       }
     });

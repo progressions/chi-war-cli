@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { createCharacterRaw, updateCharacterRaw, listCampaigns, searchFaction, listCharacters, getCharacter, deleteCharacter, getEntityNotionPage } from "../lib/api.js";
+import { createCharacterRaw, updateCharacterRaw, listCampaigns, searchFaction, listCharacters, getCharacter, deleteCharacter, getEntityNotionPage, syncToNotion, syncFromNotion } from "../lib/api.js";
 import { getCurrentCampaignId, setCurrentCampaignId } from "../lib/config.js";
 import { success, error, info } from "../lib/output.js";
 import inquirer from "inquirer";
@@ -287,6 +287,52 @@ export function registerCharacterCommands(program: Command): void {
         console.log(JSON.stringify(result, null, 2));
       } catch (err) {
         error(err instanceof Error ? err.message : "Failed to fetch Notion page");
+        process.exit(1);
+      }
+    });
+
+  // SYNC TO NOTION - Push character data to Notion
+  character
+    .command("sync-to-notion")
+    .description("Sync character data TO Notion (creates or updates Notion page)")
+    .argument("<id>", "Character ID")
+    .action(async (id) => {
+      try {
+        const char = await getCharacter(id);
+        info(`Syncing "${char.name}" to Notion...`);
+
+        const result = await syncToNotion("characters", id);
+        success(result.message);
+        console.log(`  Status: ${result.status}`);
+        console.log(`  Character: ${char.name}`);
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to sync to Notion");
+        process.exit(1);
+      }
+    });
+
+  // SYNC FROM NOTION - Pull character data from Notion
+  character
+    .command("sync-from-notion")
+    .description("Sync character data FROM Notion (updates character with Notion page content)")
+    .argument("<id>", "Character ID")
+    .option("--json", "Output updated character as JSON")
+    .action(async (id, options) => {
+      try {
+        const char = await getCharacter(id);
+        info(`Syncing "${char.name}" from Notion...`);
+
+        const updated = await syncFromNotion<Character>("characters", id);
+
+        if (options.json) {
+          console.log(JSON.stringify(updated, null, 2));
+          return;
+        }
+
+        success(`Character "${updated.name}" synced from Notion`);
+        printCharacterDetails(updated);
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to sync from Notion");
         process.exit(1);
       }
     });

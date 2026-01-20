@@ -6,6 +6,8 @@ import {
   updateJuncture,
   deleteJuncture,
   getEntityNotionPage,
+  syncToNotion,
+  syncFromNotion,
 } from "../lib/api.js";
 import { success, error, info } from "../lib/output.js";
 import * as fs from "fs";
@@ -205,6 +207,50 @@ export function registerJunctureCommands(program: Command): void {
         console.log(JSON.stringify(result, null, 2));
       } catch (err) {
         error(err instanceof Error ? err.message : "Failed to fetch Notion page");
+        process.exit(1);
+      }
+    });
+
+  // SYNC TO NOTION - Push juncture data to Notion
+  juncture
+    .command("sync-to-notion <id>")
+    .description("Sync juncture data TO Notion (creates or updates Notion page)")
+    .action(async (id) => {
+      try {
+        const item = await getJuncture(id);
+        info(`Syncing "${item.name}" to Notion...`);
+
+        const result = await syncToNotion("junctures", id);
+        success(result.message);
+        console.log(`  Status: ${result.status}`);
+        console.log(`  Juncture: ${item.name}`);
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to sync to Notion");
+        process.exit(1);
+      }
+    });
+
+  // SYNC FROM NOTION - Pull juncture data from Notion
+  juncture
+    .command("sync-from-notion <id>")
+    .description("Sync juncture data FROM Notion (updates juncture with Notion page content)")
+    .option("--json", "Output updated juncture as JSON")
+    .action(async (id, options) => {
+      try {
+        const item = await getJuncture(id);
+        info(`Syncing "${item.name}" from Notion...`);
+
+        const updated = await syncFromNotion<Juncture>("junctures", id);
+
+        if (options.json) {
+          console.log(JSON.stringify(updated, null, 2));
+          return;
+        }
+
+        success(`Juncture "${updated.name}" synced from Notion`);
+        printJunctureDetails(updated);
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to sync from Notion");
         process.exit(1);
       }
     });

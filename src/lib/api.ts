@@ -2903,3 +2903,98 @@ export async function getEntityNotionPage(
     throw error;
   }
 }
+
+// Notion Sync Types
+export type NotionSyncEntityType =
+  | "adventures"
+  | "characters"
+  | "junctures"
+  | "factions"
+  | "sites"
+  | "parties";
+
+export interface NotionSyncToResponse {
+  status: string;
+  message: string;
+}
+
+export interface NotionSyncFromResponse<T> {
+  entity: T;
+}
+
+/**
+ * Sync an entity TO Notion.
+ * This queues a background job - the sync will complete asynchronously.
+ */
+export async function syncToNotion(
+  entityType: NotionSyncEntityType,
+  entityId: string
+): Promise<NotionSyncToResponse> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.post(`/api/v2/${entityType}/${entityId}/sync`);
+    return {
+      status: response.data.status || "queued",
+      message: response.data.message || `Sync to Notion queued`,
+    };
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error(`${entityType.slice(0, -1)} not found`);
+      }
+      if (error.response.status === 403) {
+        throw new Error(`Not authorized to sync this ${entityType.slice(0, -1)}`);
+      }
+      if (error.response.status === 422) {
+        const data = error.response.data as ApiError;
+        throw new Error(data.error || data.message || "Cannot sync - entity may not have required data");
+      }
+      const data = error.response.data as ApiError;
+      throw new Error(data.error || data.message || "Failed to sync to Notion");
+    }
+    throw error;
+  }
+}
+
+/**
+ * Sync an entity FROM Notion.
+ * This updates the entity with data from its linked Notion page.
+ */
+export async function syncFromNotion<T>(
+  entityType: NotionSyncEntityType,
+  entityId: string
+): Promise<T> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.post(`/api/v2/${entityType}/${entityId}/sync_from_notion`);
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error(`${entityType.slice(0, -1)} not found`);
+      }
+      if (error.response.status === 403) {
+        throw new Error(`Not authorized to sync this ${entityType.slice(0, -1)}`);
+      }
+      if (error.response.status === 422) {
+        const data = error.response.data as ApiError;
+        throw new Error(data.error || data.message || "Cannot sync - entity may not have a linked Notion page");
+      }
+      const data = error.response.data as ApiError;
+      throw new Error(data.error || data.message || "Failed to sync from Notion");
+    }
+    throw error;
+  }
+}

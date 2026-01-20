@@ -172,6 +172,33 @@ chiwar session 5-10
 chiwar notion search "yakuza blues"
 ```
 
+### Notion Sync Commands
+
+Sync entity data to and from Notion pages. Available for: adventure, character, juncture, faction, site, party.
+
+```bash
+# Sync TO Notion (push local data to Notion page)
+chiwar adventure sync-to-notion <id>
+chiwar character sync-to-notion <id>
+chiwar juncture sync-to-notion <id>
+chiwar faction sync-to-notion <id>
+chiwar site sync-to-notion <id>
+chiwar party sync-to-notion <id>
+
+# Sync FROM Notion (pull Notion page data to local)
+chiwar adventure sync-from-notion <id>
+chiwar character sync-from-notion <id>
+chiwar juncture sync-from-notion <id>
+chiwar faction sync-from-notion <id>
+chiwar site sync-from-notion <id>
+chiwar party sync-from-notion <id>
+
+# With JSON output
+chiwar character sync-from-notion <id> --json
+```
+
+**Note:** `sync-to-notion` queues a background job - changes appear asynchronously. `sync-from-notion` updates immediately and returns the updated entity.
+
 ## JSON Output
 
 Most commands support `--json` flag for machine-readable output:
