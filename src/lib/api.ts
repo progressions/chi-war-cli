@@ -2998,3 +2998,64 @@ export async function syncFromNotion<T>(
     throw error;
   }
 }
+
+// =============================================================================
+// Notion Sync Logs API
+// =============================================================================
+
+export interface NotionSyncLog {
+  id: string;
+  status: string;
+  payload: Record<string, unknown> | null;
+  response: Record<string, unknown> | null;
+  error_message: string | null;
+  entity_type: string;
+  entity_id: string;
+  character_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NotionSyncLogResponse {
+  notion_sync_logs: NotionSyncLog[];
+  meta: PaginationMeta;
+}
+
+/**
+ * Fetch Notion sync logs for a linked entity.
+ * Useful for debugging Notion sync issues.
+ */
+export async function getEntitySyncLogs(
+  entityType: NotionPageEntityType,
+  entityId: string,
+  options?: { limit?: number; page?: number }
+): Promise<NotionSyncLogResponse> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const params: Record<string, string> = {};
+    if (options?.limit) params.limit = String(options.limit);
+    if (options?.page) params.page = String(options.page);
+
+    const response = await client.get(`/api/v2/${entityType}/${entityId}/notion_sync_logs`, { params });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        const data = error.response.data as ApiError;
+        throw new Error(data.error || data.message || `${entityType.slice(0, -1)} not found`);
+      }
+      if (error.response.status === 403) {
+        throw new Error(`Not authorized to view sync logs for this ${entityType.slice(0, -1)}`);
+      }
+      const data = error.response.data as ApiError;
+      throw new Error(data.error || data.message || "Failed to fetch sync logs");
+    }
+    throw error;
+  }
+}
