@@ -28,6 +28,8 @@ import type {
   AiAttachResponse,
   MediaLibraryImage,
   MediaLibraryResponse,
+  Adventure,
+  AdventureListResponse,
   Encounter,
   SwerveResult,
   Notification,
@@ -2562,6 +2564,66 @@ export async function sendNotification(
 }
 
 // =============================================================================
+// Adventure API (Chi War database)
+// =============================================================================
+
+interface ListAdventuresOptions {
+  limit?: number;
+  page?: number;
+  active?: boolean;
+}
+
+export async function listAdventures(
+  options: ListAdventuresOptions = {}
+): Promise<AdventureListResponse> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  const params = new URLSearchParams();
+  if (options.limit) params.append("per_page", options.limit.toString());
+  if (options.page) params.append("page", options.page.toString());
+  if (options.active !== undefined) params.append("active", options.active.toString());
+
+  try {
+    const response = await client.get(`/api/v2/adventures?${params.toString()}`);
+    return {
+      adventures: response.data.adventures || [],
+      meta: response.data.meta || { current_page: 1, total_pages: 1, total_count: 0, per_page: 25 },
+    };
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      throw new Error("Failed to list adventures");
+    }
+    throw error;
+  }
+}
+
+export async function getAdventure(adventureId: string): Promise<Adventure> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.get(`/api/v2/adventures/${adventureId}`);
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error("Adventure not found");
+      }
+      throw new Error("Failed to get adventure");
+    }
+    throw error;
+  }
+}
+
 // Adventure API (Notion)
 // =============================================================================
 
@@ -2792,6 +2854,146 @@ export async function deleteAdvancement(
         throw new Error("Not authorized to delete this advancement");
       }
       throw new Error("Failed to delete advancement");
+    }
+    throw error;
+  }
+}
+
+// =============================================================================
+// Notion Page API (Raw page data for debugging)
+// =============================================================================
+
+export type NotionPageEntityType = "characters" | "sites" | "parties" | "factions" | "junctures" | "adventures";
+
+export interface NotionPageResponse {
+  notion_page_id: string;
+  page: Record<string, unknown>;
+}
+
+/**
+ * Fetch raw Notion page JSON for a linked entity.
+ * Useful for debugging Notion sync issues.
+ */
+export async function getEntityNotionPage(
+  entityType: NotionPageEntityType,
+  entityId: string
+): Promise<NotionPageResponse> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.get(`/api/v2/${entityType}/${entityId}/notion_page`);
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        const data = error.response.data as ApiError;
+        throw new Error(data.error || data.message || `No Notion page linked to this ${entityType.slice(0, -1)}`);
+      }
+      if (error.response.status === 403) {
+        throw new Error("Not authorized to access this entity's Notion page");
+      }
+      const data = error.response.data as ApiError;
+      throw new Error(data.error || data.message || "Failed to fetch Notion page");
+    }
+    throw error;
+  }
+}
+
+// Notion Sync Types
+export type NotionSyncEntityType =
+  | "adventures"
+  | "characters"
+  | "junctures"
+  | "factions"
+  | "sites"
+  | "parties";
+
+export interface NotionSyncToResponse {
+  status: string;
+  message: string;
+}
+
+export interface NotionSyncFromResponse<T> {
+  entity: T;
+}
+
+/**
+ * Sync an entity TO Notion.
+ * This queues a background job - the sync will complete asynchronously.
+ */
+export async function syncToNotion(
+  entityType: NotionSyncEntityType,
+  entityId: string
+): Promise<NotionSyncToResponse> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.post(`/api/v2/${entityType}/${entityId}/sync`);
+    return {
+      status: response.data.status || "queued",
+      message: response.data.message || `Sync to Notion queued`,
+    };
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error(`${entityType.slice(0, -1)} not found`);
+      }
+      if (error.response.status === 403) {
+        throw new Error(`Not authorized to sync this ${entityType.slice(0, -1)}`);
+      }
+      if (error.response.status === 422) {
+        const data = error.response.data as ApiError;
+        throw new Error(data.error || data.message || "Cannot sync - entity may not have required data");
+      }
+      const data = error.response.data as ApiError;
+      throw new Error(data.error || data.message || "Failed to sync to Notion");
+    }
+    throw error;
+  }
+}
+
+/**
+ * Sync an entity FROM Notion.
+ * This updates the entity with data from its linked Notion page.
+ */
+export async function syncFromNotion<T>(
+  entityType: NotionSyncEntityType,
+  entityId: string
+): Promise<T> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.post(`/api/v2/${entityType}/${entityId}/sync_from_notion`);
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error(`${entityType.slice(0, -1)} not found`);
+      }
+      if (error.response.status === 403) {
+        throw new Error(`Not authorized to sync this ${entityType.slice(0, -1)}`);
+      }
+      if (error.response.status === 422) {
+        const data = error.response.data as ApiError;
+        throw new Error(data.error || data.message || "Cannot sync - entity may not have a linked Notion page");
+      }
+      const data = error.response.data as ApiError;
+      throw new Error(data.error || data.message || "Failed to sync from Notion");
     }
     throw error;
   }

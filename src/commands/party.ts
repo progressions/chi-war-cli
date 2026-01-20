@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { listParties, getParty, createParty, updateParty, deleteParty, searchFaction, listPartyTemplates, applyPartyTemplate, assignCharacterToSlot, clearSlot } from "../lib/api.js";
+import { listParties, getParty, createParty, updateParty, deleteParty, searchFaction, listPartyTemplates, applyPartyTemplate, assignCharacterToSlot, clearSlot, getEntityNotionPage, syncToNotion, syncFromNotion } from "../lib/api.js";
 import { getCurrentCampaignId } from "../lib/config.js";
 import { success, error, info } from "../lib/output.js";
 import * as fs from "fs";
@@ -363,6 +363,66 @@ export function registerPartyCommands(program: Command): void {
         console.log("");
       } catch (err) {
         error(err instanceof Error ? err.message : "Failed to clear slot");
+        process.exit(1);
+      }
+    });
+
+  party
+    .command("notion-page")
+    .description("Fetch raw Notion page JSON for a party (for debugging)")
+    .argument("<id>", "Party ID")
+    .action(async (id) => {
+      try {
+        const result = await getEntityNotionPage("parties", id);
+        console.log(JSON.stringify(result, null, 2));
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to fetch Notion page");
+        process.exit(1);
+      }
+    });
+
+  // SYNC TO NOTION - Push party data to Notion
+  party
+    .command("sync-to-notion")
+    .description("Sync party data TO Notion (creates or updates Notion page)")
+    .argument("<id>", "Party ID")
+    .action(async (id) => {
+      try {
+        const item = await getParty(id);
+        info(`Syncing "${item.name}" to Notion...`);
+
+        const result = await syncToNotion("parties", id);
+        success(result.message);
+        console.log(`  Status: ${result.status}`);
+        console.log(`  Party: ${item.name}`);
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to sync to Notion");
+        process.exit(1);
+      }
+    });
+
+  // SYNC FROM NOTION - Pull party data from Notion
+  party
+    .command("sync-from-notion")
+    .description("Sync party data FROM Notion (updates party with Notion page content)")
+    .argument("<id>", "Party ID")
+    .option("--json", "Output updated party as JSON")
+    .action(async (id, options) => {
+      try {
+        const item = await getParty(id);
+        info(`Syncing "${item.name}" from Notion...`);
+
+        const updated = await syncFromNotion<Party>("parties", id);
+
+        if (options.json) {
+          console.log(JSON.stringify(updated, null, 2));
+          return;
+        }
+
+        success(`Party "${updated.name}" synced from Notion`);
+        printPartyDetails(updated);
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to sync from Notion");
         process.exit(1);
       }
     });

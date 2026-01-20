@@ -514,3 +514,22 @@ export interface AdvancementListResponse {
   advancements: Advancement[];
   meta: PaginationMeta;
 }
+
+// Adventure types
+export interface Adventure {
+  id: string;
+  name: string;
+  description?: string;
+  active: boolean;
+  campaign_id: string;
+  notion_page_id?: string;
+  image_url?: string;
+  at_a_glance?: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdventureListResponse {
+  adventures: Adventure[];
+  meta: PaginationMeta;
+}

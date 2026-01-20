@@ -5,6 +5,9 @@ import {
   createSite,
   updateSite,
   deleteSite,
+  getEntityNotionPage,
+  syncToNotion,
+  syncFromNotion,
 } from "../lib/api.js";
 import { success, error, info } from "../lib/output.js";
 import * as fs from "fs";
@@ -187,6 +190,64 @@ export function registerSiteCommands(program: Command): void {
         success(`Deleted site: ${item.name}`);
       } catch (err) {
         error(err instanceof Error ? err.message : "Failed to delete site");
+        process.exit(1);
+      }
+    });
+
+  // NOTION-PAGE
+  site
+    .command("notion-page <id>")
+    .description("Fetch raw Notion page JSON for a site (for debugging)")
+    .action(async (id) => {
+      try {
+        const result = await getEntityNotionPage("sites", id);
+        console.log(JSON.stringify(result, null, 2));
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to fetch Notion page");
+        process.exit(1);
+      }
+    });
+
+  // SYNC TO NOTION - Push site data to Notion
+  site
+    .command("sync-to-notion <id>")
+    .description("Sync site data TO Notion (creates or updates Notion page)")
+    .action(async (id) => {
+      try {
+        const item = await getSite(id);
+        info(`Syncing "${item.name}" to Notion...`);
+
+        const result = await syncToNotion("sites", id);
+        success(result.message);
+        console.log(`  Status: ${result.status}`);
+        console.log(`  Site: ${item.name}`);
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to sync to Notion");
+        process.exit(1);
+      }
+    });
+
+  // SYNC FROM NOTION - Pull site data from Notion
+  site
+    .command("sync-from-notion <id>")
+    .description("Sync site data FROM Notion (updates site with Notion page content)")
+    .option("--json", "Output updated site as JSON")
+    .action(async (id, options) => {
+      try {
+        const item = await getSite(id);
+        info(`Syncing "${item.name}" from Notion...`);
+
+        const updated = await syncFromNotion<Site>("sites", id);
+
+        if (options.json) {
+          console.log(JSON.stringify(updated, null, 2));
+          return;
+        }
+
+        success(`Site "${updated.name}" synced from Notion`);
+        printSiteDetails(updated);
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to sync from Notion");
         process.exit(1);
       }
     });

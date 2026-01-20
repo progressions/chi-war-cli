@@ -6,6 +6,9 @@ import {
   createFaction,
   updateFaction,
   deleteFaction,
+  getEntityNotionPage,
+  syncToNotion,
+  syncFromNotion,
   type Faction
 } from "../lib/api.js";
 import { success, error, info } from "../lib/output.js";
@@ -218,6 +221,64 @@ export function registerFactionCommands(program: Command): void {
         success(`Deleted faction: ${item.name}`);
       } catch (err) {
         error(err instanceof Error ? err.message : "Failed to delete faction");
+        process.exit(1);
+      }
+    });
+
+  // NOTION-PAGE
+  faction
+    .command("notion-page <id>")
+    .description("Fetch raw Notion page JSON for a faction (for debugging)")
+    .action(async (id) => {
+      try {
+        const result = await getEntityNotionPage("factions", id);
+        console.log(JSON.stringify(result, null, 2));
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to fetch Notion page");
+        process.exit(1);
+      }
+    });
+
+  // SYNC TO NOTION - Push faction data to Notion
+  faction
+    .command("sync-to-notion <id>")
+    .description("Sync faction data TO Notion (creates or updates Notion page)")
+    .action(async (id) => {
+      try {
+        const item = await getFaction(id);
+        info(`Syncing "${item.name}" to Notion...`);
+
+        const result = await syncToNotion("factions", id);
+        success(result.message);
+        console.log(`  Status: ${result.status}`);
+        console.log(`  Faction: ${item.name}`);
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to sync to Notion");
+        process.exit(1);
+      }
+    });
+
+  // SYNC FROM NOTION - Pull faction data from Notion
+  faction
+    .command("sync-from-notion <id>")
+    .description("Sync faction data FROM Notion (updates faction with Notion page content)")
+    .option("--json", "Output updated faction as JSON")
+    .action(async (id, options) => {
+      try {
+        const item = await getFaction(id);
+        info(`Syncing "${item.name}" from Notion...`);
+
+        const updated = await syncFromNotion<Faction>("factions", id);
+
+        if (options.json) {
+          console.log(JSON.stringify(updated, null, 2));
+          return;
+        }
+
+        success(`Faction "${updated.name}" synced from Notion`);
+        printFactionDetails(updated);
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to sync from Notion");
         process.exit(1);
       }
     });

@@ -1,12 +1,74 @@
 import { Command } from "commander";
-import { fetchAdventure, fetchAdventureById } from "../lib/api.js";
+import { fetchAdventure, fetchAdventureById, getEntityNotionPage, listAdventures, getAdventure, syncToNotion, syncFromNotion } from "../lib/api.js";
 import { success, error, info } from "../lib/output.js";
+import type { Adventure } from "../types/index.js";
 
 export function registerAdventureCommands(program: Command): void {
   const adventure = program
     .command("adventure")
-    .description("Fetch adventures from Notion");
+    .description("Manage adventures");
 
+  // LIST - list adventures from Chi War database
+  adventure
+    .command("list")
+    .description("List adventures in the current campaign")
+    .option("-n, --limit <number>", "Results per page", "20")
+    .option("-p, --page <number>", "Page number", "1")
+    .option("--json", "Output as JSON")
+    .action(async (options) => {
+      try {
+        const result = await listAdventures({
+          limit: parseInt(options.limit),
+          page: parseInt(options.page),
+        });
+
+        if (options.json) {
+          console.log(JSON.stringify(result.adventures, null, 2));
+          return;
+        }
+
+        if (result.adventures.length === 0) {
+          info("No adventures found");
+          return;
+        }
+
+        console.log(`\nAdventures (${result.meta.total_count} total):\n`);
+        for (const adv of result.adventures) {
+          printAdventureSummary(adv);
+        }
+
+        if (result.meta.total_pages > 1) {
+          console.log(`\nPage ${result.meta.current_page} of ${result.meta.total_pages}`);
+        }
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to list adventures");
+        process.exit(1);
+      }
+    });
+
+  // SHOW - show adventure details from Chi War database
+  adventure
+    .command("show")
+    .description("Show adventure details")
+    .argument("<id>", "Adventure ID")
+    .option("--json", "Output as JSON")
+    .action(async (id, options) => {
+      try {
+        const adv = await getAdventure(id);
+
+        if (options.json) {
+          console.log(JSON.stringify(adv, null, 2));
+          return;
+        }
+
+        printAdventureDetails(adv);
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to get adventure");
+        process.exit(1);
+      }
+    });
+
+  // FETCH - fetch adventure content from Notion
   adventure
     .command("fetch")
     .description("Fetch adventure by search query (e.g., 'Chicago On Fire', 'Tesla')")
@@ -86,4 +148,97 @@ export function registerAdventureCommands(program: Command): void {
         process.exit(1);
       }
     });
+
+  adventure
+    .command("notion-page")
+    .description("Fetch raw Notion page JSON for an adventure (for debugging)")
+    .argument("<id>", "Adventure ID")
+    .action(async (id) => {
+      try {
+        const result = await getEntityNotionPage("adventures", id);
+        console.log(JSON.stringify(result, null, 2));
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to fetch Notion page");
+        process.exit(1);
+      }
+    });
+
+  // SYNC TO NOTION - Push adventure data to Notion
+  adventure
+    .command("sync-to-notion")
+    .description("Sync adventure data TO Notion (creates or updates Notion page)")
+    .argument("<id>", "Adventure ID")
+    .action(async (id) => {
+      try {
+        const adv = await getAdventure(id);
+        info(`Syncing "${adv.name}" to Notion...`);
+
+        const result = await syncToNotion("adventures", id);
+        success(result.message);
+        console.log(`  Status: ${result.status}`);
+        console.log(`  Adventure: ${adv.name}`);
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to sync to Notion");
+        process.exit(1);
+      }
+    });
+
+  // SYNC FROM NOTION - Pull adventure data from Notion
+  adventure
+    .command("sync-from-notion")
+    .description("Sync adventure data FROM Notion (updates adventure with Notion page content)")
+    .argument("<id>", "Adventure ID")
+    .option("--json", "Output updated adventure as JSON")
+    .action(async (id, options) => {
+      try {
+        const adv = await getAdventure(id);
+        info(`Syncing "${adv.name}" from Notion...`);
+
+        const updated = await syncFromNotion<Adventure>("adventures", id);
+
+        if (options.json) {
+          console.log(JSON.stringify(updated, null, 2));
+          return;
+        }
+
+        success(`Adventure "${updated.name}" synced from Notion`);
+        printAdventureDetails(updated);
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to sync from Notion");
+        process.exit(1);
+      }
+    });
+}
+
+function printAdventureSummary(adv: Adventure): void {
+  const status = adv.active ? "" : " [INACTIVE]";
+  const notion = adv.notion_page_id ? " [Notion]" : "";
+
+  console.log(`  ${adv.name}${status}${notion}`);
+  console.log(`    ID: ${adv.id}`);
+  if (adv.description) {
+    const desc = adv.description.length > 60
+      ? adv.description.substring(0, 60) + "..."
+      : adv.description;
+    console.log(`    ${desc}`);
+  }
+  console.log("");
+}
+
+function printAdventureDetails(adv: Adventure): void {
+  console.log(`\n${adv.name}`);
+  console.log("=".repeat(adv.name.length));
+  console.log(`  ID: ${adv.id}`);
+  console.log(`  Status: ${adv.active ? "Active" : "Inactive"}`);
+  if (adv.notion_page_id) {
+    console.log(`  Notion Page ID: ${adv.notion_page_id}`);
+  }
+  if (adv.description) {
+    console.log(`  Description: ${adv.description}`);
+  }
+  if (adv.at_a_glance !== undefined) {
+    console.log(`  At a Glance: ${adv.at_a_glance ? "Yes" : "No"}`);
+  }
+  console.log(`  Created: ${new Date(adv.created_at).toLocaleDateString()}`);
+  console.log("");
 }
