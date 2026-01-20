@@ -5,6 +5,7 @@ import {
   createJuncture,
   updateJuncture,
   deleteJuncture,
+  getEntityNotionPage,
 } from "../lib/api.js";
 import { success, error, info } from "../lib/output.js";
 import * as fs from "fs";
@@ -190,6 +191,20 @@ export function registerJunctureCommands(program: Command): void {
         success(`Deleted juncture: ${item.name}`);
       } catch (err) {
         error(err instanceof Error ? err.message : "Failed to delete juncture");
+        process.exit(1);
+      }
+    });
+
+  // NOTION-PAGE
+  juncture
+    .command("notion-page <id>")
+    .description("Fetch raw Notion page JSON for a juncture (for debugging)")
+    .action(async (id) => {
+      try {
+        const result = await getEntityNotionPage("junctures", id);
+        console.log(JSON.stringify(result, null, 2));
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to fetch Notion page");
         process.exit(1);
       }
     });

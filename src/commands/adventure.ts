@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { fetchAdventure, fetchAdventureById } from "../lib/api.js";
+import { fetchAdventure, fetchAdventureById, getEntityNotionPage } from "../lib/api.js";
 import { success, error, info } from "../lib/output.js";
 
 export function registerAdventureCommands(program: Command): void {
@@ -83,6 +83,20 @@ export function registerAdventureCommands(program: Command): void {
         }
       } catch (err) {
         error(err instanceof Error ? err.message : "Failed to search adventures");
+        process.exit(1);
+      }
+    });
+
+  adventure
+    .command("notion-page")
+    .description("Fetch raw Notion page JSON for an adventure (for debugging)")
+    .argument("<id>", "Adventure ID")
+    .action(async (id) => {
+      try {
+        const result = await getEntityNotionPage("adventures", id);
+        console.log(JSON.stringify(result, null, 2));
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to fetch Notion page");
         process.exit(1);
       }
     });

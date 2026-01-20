@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { createCharacterRaw, updateCharacterRaw, listCampaigns, searchFaction, listCharacters, getCharacter, deleteCharacter } from "../lib/api.js";
+import { createCharacterRaw, updateCharacterRaw, listCampaigns, searchFaction, listCharacters, getCharacter, deleteCharacter, getEntityNotionPage } from "../lib/api.js";
 import { getCurrentCampaignId, setCurrentCampaignId } from "../lib/config.js";
 import { success, error, info } from "../lib/output.js";
 import inquirer from "inquirer";
@@ -273,6 +273,20 @@ export function registerCharacterCommands(program: Command): void {
         success(`Deleted character: ${char.name}`);
       } catch (err) {
         error(err instanceof Error ? err.message : "Failed to delete character");
+        process.exit(1);
+      }
+    });
+
+  character
+    .command("notion-page")
+    .description("Fetch raw Notion page JSON for a character (for debugging)")
+    .argument("<id>", "Character ID")
+    .action(async (id) => {
+      try {
+        const result = await getEntityNotionPage("characters", id);
+        console.log(JSON.stringify(result, null, 2));
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to fetch Notion page");
         process.exit(1);
       }
     });

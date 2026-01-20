@@ -6,6 +6,7 @@ import {
   createFaction,
   updateFaction,
   deleteFaction,
+  getEntityNotionPage,
   type Faction
 } from "../lib/api.js";
 import { success, error, info } from "../lib/output.js";
@@ -218,6 +219,20 @@ export function registerFactionCommands(program: Command): void {
         success(`Deleted faction: ${item.name}`);
       } catch (err) {
         error(err instanceof Error ? err.message : "Failed to delete faction");
+        process.exit(1);
+      }
+    });
+
+  // NOTION-PAGE
+  faction
+    .command("notion-page <id>")
+    .description("Fetch raw Notion page JSON for a faction (for debugging)")
+    .action(async (id) => {
+      try {
+        const result = await getEntityNotionPage("factions", id);
+        console.log(JSON.stringify(result, null, 2));
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to fetch Notion page");
         process.exit(1);
       }
     });

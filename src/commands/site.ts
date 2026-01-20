@@ -5,6 +5,7 @@ import {
   createSite,
   updateSite,
   deleteSite,
+  getEntityNotionPage,
 } from "../lib/api.js";
 import { success, error, info } from "../lib/output.js";
 import * as fs from "fs";
@@ -187,6 +188,20 @@ export function registerSiteCommands(program: Command): void {
         success(`Deleted site: ${item.name}`);
       } catch (err) {
         error(err instanceof Error ? err.message : "Failed to delete site");
+        process.exit(1);
+      }
+    });
+
+  // NOTION-PAGE
+  site
+    .command("notion-page <id>")
+    .description("Fetch raw Notion page JSON for a site (for debugging)")
+    .action(async (id) => {
+      try {
+        const result = await getEntityNotionPage("sites", id);
+        console.log(JSON.stringify(result, null, 2));
+      } catch (err) {
+        error(err instanceof Error ? err.message : "Failed to fetch Notion page");
         process.exit(1);
       }
     });

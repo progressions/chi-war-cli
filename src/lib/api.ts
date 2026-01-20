@@ -2796,3 +2796,48 @@ export async function deleteAdvancement(
     throw error;
   }
 }
+
+// =============================================================================
+// Notion Page API (Raw page data for debugging)
+// =============================================================================
+
+export type NotionPageEntityType = "characters" | "sites" | "parties" | "factions" | "junctures" | "adventures";
+
+export interface NotionPageResponse {
+  notion_page_id: string;
+  page: Record<string, unknown>;
+}
+
+/**
+ * Fetch raw Notion page JSON for a linked entity.
+ * Useful for debugging Notion sync issues.
+ */
+export async function getEntityNotionPage(
+  entityType: NotionPageEntityType,
+  entityId: string
+): Promise<NotionPageResponse> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.get(`/api/v2/${entityType}/${entityId}/notion_page`);
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        const data = error.response.data as ApiError;
+        throw new Error(data.error || data.message || `No Notion page linked to this ${entityType.slice(0, -1)}`);
+      }
+      if (error.response.status === 403) {
+        throw new Error("Not authorized to access this entity's Notion page");
+      }
+      const data = error.response.data as ApiError;
+      throw new Error(data.error || data.message || "Failed to fetch Notion page");
+    }
+    throw error;
+  }
+}
