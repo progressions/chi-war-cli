@@ -9,10 +9,13 @@ import {
   syncToNotion,
   syncFromNotion,
   getEntitySyncLogs,
+  searchJunctures,
+  updateJunctureNotionLink,
 } from "../lib/api.js";
 import { success, error, info } from "../lib/output.js";
 import * as fs from "fs";
 import type { Juncture } from "../types/index.js";
+import { linkEntityToNotion } from "../lib/notionLinker.js";
 
 export function registerJunctureCommands(program: Command): void {
   const juncture = program
@@ -208,6 +211,43 @@ export function registerJunctureCommands(program: Command): void {
         console.log(JSON.stringify(result, null, 2));
       } catch (err) {
         error(err instanceof Error ? err.message : "Failed to fetch Notion page");
+        process.exit(1);
+      }
+    });
+
+  // LINK NOTION - Attach a Notion page by juncture name/ID and Notion page name
+  juncture
+    .command("link-notion <nameOrId>")
+    .description("Link a juncture to a Notion page by juncture name/ID and Notion page name")
+    .option("--notion <pageName>", "Notion page name to search (defaults to juncture name)")
+    .action(async (nameOrId, options) => {
+      try {
+        const result = await linkEntityToNotion<Juncture>({
+          target: nameOrId,
+          notionName: options.notion,
+          entityLabel: "juncture",
+          findById: getJuncture,
+          searchByName: async (name) => {
+            const list = await searchJunctures({ search: name, limit: 10, page: 1 });
+            return list.junctures || list;
+          },
+          updateEntity: async (id, notionPageId) => updateJunctureNotionLink(id, notionPageId),
+          getId: (j) => (j as any).id,
+          getName: (j) => (j as any).name,
+          getNotionId: (j) => (j as any).notion_page_id,
+        });
+
+        if (result.updated) {
+          success(`Linked juncture \"${result.entity.name}\" to Notion page ${result.notionPage.id}`);
+        } else {
+          info(`Juncture \"${result.entity.name}\" is already linked to ${result.notionPage.id}`);
+        }
+      } catch (err) {
+        if (err instanceof Error && err.message === "Linking cancelled") {
+          info("Linking cancelled");
+          return;
+        }
+        error(err instanceof Error ? err.message : "Failed to link juncture to Notion");
         process.exit(1);
       }
     });

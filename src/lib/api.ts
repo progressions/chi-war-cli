@@ -492,6 +492,12 @@ export async function listFactions(): Promise<Faction[]> {
   }
 }
 
+export async function searchFactions(query: string): Promise<Faction[]> {
+  const factions = await listFactions();
+  const term = query.toLowerCase();
+  return factions.filter((f) => f.name.toLowerCase().includes(term));
+}
+
 export async function searchFaction(query: string): Promise<Faction | null> {
   const factions = await listFactions();
   const lowerQuery = query.toLowerCase();
@@ -507,6 +513,10 @@ export async function searchFaction(query: string): Promise<Faction | null> {
   // Try contains match
   match = factions.find(f => f.name.toLowerCase().includes(lowerQuery));
   return match || null;
+}
+
+export async function updateFactionNotionLink(factionId: string, notionPageId: string): Promise<Faction> {
+  return updateFaction(factionId, { notion_page_id: notionPageId });
 }
 
 export async function getFaction(factionId: string): Promise<Faction> {
@@ -711,6 +721,32 @@ export async function listCharacters(
   }
 }
 
+export async function searchCharacters(
+  query: string
+): Promise<ListCharactersResponse> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.get(`/api/v2/characters/names`, {
+      params: { q: query },
+    });
+    return {
+      characters: response.data.characters || [],
+      meta: response.data.meta || { current_page: 1, total_pages: 1, total_count: 0, per_page: 25 },
+    };
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      throw new Error("Failed to search characters");
+    }
+    throw error;
+  }
+}
+
 export async function getCharacter(characterId: string): Promise<Character> {
   const token = getToken();
   if (!token) {
@@ -761,6 +797,7 @@ export async function deleteCharacter(characterId: string): Promise<void> {
 export interface ListPartiesOptions {
   limit?: number;
   page?: number;
+  search?: string;
 }
 
 export interface ListPartiesResponse {
@@ -786,6 +823,7 @@ export async function listParties(
   const params = new URLSearchParams();
   if (options.limit) params.append("per_page", options.limit.toString());
   if (options.page) params.append("page", options.page.toString());
+  if (options.search) params.append("search", options.search);
 
   try {
     const response = await client.get(`/api/v2/parties?${params.toString()}`);
@@ -799,6 +837,18 @@ export async function listParties(
     }
     throw error;
   }
+}
+
+export async function searchParties(options: { search: string; limit?: number; page?: number }): Promise<ListPartiesResponse> {
+  return listParties({
+    limit: options.limit ?? 10,
+    page: options.page ?? 1,
+    search: options.search,
+  });
+}
+
+export async function updatePartyNotionLink(partyId: string, notionPageId: string): Promise<Party> {
+  return updateParty(partyId, { notion_page_id: notionPageId });
 }
 
 export async function getParty(partyId: string): Promise<Party> {
@@ -1513,6 +1563,7 @@ export interface ListSitesOptions {
   limit?: number;
   page?: number;
   active?: boolean;
+  search?: string;
 }
 
 export async function listSites(
@@ -1529,6 +1580,7 @@ export async function listSites(
   if (options.limit) params.append("per_page", options.limit.toString());
   if (options.page) params.append("page", options.page.toString());
   if (options.active !== undefined) params.append("active", options.active.toString());
+  if (options.search) params.append("search", options.search);
 
   try {
     const response = await client.get(`/api/v2/sites?${params.toString()}`);
@@ -1542,6 +1594,18 @@ export async function listSites(
     }
     throw error;
   }
+}
+
+export async function searchSites(options: { search: string; limit?: number; page?: number }): Promise<SiteListResponse> {
+  return listSites({
+    limit: options.limit ?? 10,
+    page: options.page ?? 1,
+    search: options.search,
+  });
+}
+
+export async function updateSiteNotionLink(siteId: string, notionPageId: string): Promise<Site> {
+  return updateSite(siteId, { notion_page_id: notionPageId });
 }
 
 export async function getSite(siteId: string): Promise<Site> {
@@ -1656,6 +1720,7 @@ export interface ListJuncturesOptions {
   limit?: number;
   page?: number;
   active?: boolean;
+  search?: string;
 }
 
 export async function listJunctures(
@@ -1672,6 +1737,7 @@ export async function listJunctures(
   if (options.limit) params.append("per_page", options.limit.toString());
   if (options.page) params.append("page", options.page.toString());
   if (options.active !== undefined) params.append("active", options.active.toString());
+  if (options.search) params.append("search", options.search);
 
   try {
     const response = await client.get(`/api/v2/junctures?${params.toString()}`);
@@ -1685,6 +1751,18 @@ export async function listJunctures(
     }
     throw error;
   }
+}
+
+export async function searchJunctures(options: { search: string; limit?: number; page?: number }): Promise<JunctureListResponse> {
+  return listJunctures({
+    limit: options.limit ?? 10,
+    page: options.page ?? 1,
+    search: options.search,
+  });
+}
+
+export async function updateJunctureNotionLink(junctureId: string, notionPageId: string): Promise<Juncture> {
+  return updateJuncture(junctureId, { notion_page_id: notionPageId });
 }
 
 export async function getJuncture(junctureId: string): Promise<Juncture> {
@@ -2571,6 +2649,7 @@ interface ListAdventuresOptions {
   limit?: number;
   page?: number;
   active?: boolean;
+  search?: string;
 }
 
 export async function listAdventures(
@@ -2587,6 +2666,7 @@ export async function listAdventures(
   if (options.limit) params.append("per_page", options.limit.toString());
   if (options.page) params.append("page", options.page.toString());
   if (options.active !== undefined) params.append("active", options.active.toString());
+  if (options.search) params.append("search", options.search);
 
   try {
     const response = await client.get(`/api/v2/adventures?${params.toString()}`);
@@ -2597,6 +2677,42 @@ export async function listAdventures(
   } catch (error) {
     if (error instanceof AxiosError && error.response) {
       throw new Error("Failed to list adventures");
+    }
+    throw error;
+  }
+}
+
+export async function searchAdventures(options: { search: string; limit?: number; page?: number }): Promise<AdventureListResponse> {
+  return listAdventures({
+    limit: options.limit ?? 10,
+    page: options.page ?? 1,
+    search: options.search,
+  });
+}
+
+export async function updateAdventureNotionLink(adventureId: string, notionPageId: string): Promise<Adventure> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.patch(`/api/v2/adventures/${adventureId}`, {
+      adventure: { notion_page_id: notionPageId },
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      const data = error.response.data as ApiError;
+      if (data.errors) {
+        const messages = Object.entries(data.errors)
+          .map(([field, errs]) => `${field}: ${errs.join(", ")}`)
+          .join("; ");
+        throw new Error(`Failed to update adventure: ${messages}`);
+      }
+      throw new Error(data.message || "Failed to update adventure");
     }
     throw error;
   }
