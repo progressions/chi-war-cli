@@ -1,7 +1,8 @@
 import { Command } from "commander";
-import { fetchAdventure, fetchAdventureById, getEntityNotionPage, listAdventures, getAdventure, syncToNotion, syncFromNotion, getEntitySyncLogs } from "../lib/api.js";
+import { fetchAdventure, fetchAdventureById, getEntityNotionPage, listAdventures, getAdventure, syncToNotion, syncFromNotion, getEntitySyncLogs, searchAdventures, updateAdventureNotionLink } from "../lib/api.js";
 import { success, error, info } from "../lib/output.js";
 import type { Adventure } from "../types/index.js";
+import { linkEntityToNotion } from "../lib/notionLinker.js";
 
 export function registerAdventureCommands(program: Command): void {
   const adventure = program
@@ -159,6 +160,43 @@ export function registerAdventureCommands(program: Command): void {
         console.log(JSON.stringify(result, null, 2));
       } catch (err) {
         error(err instanceof Error ? err.message : "Failed to fetch Notion page");
+        process.exit(1);
+      }
+    });
+
+  // LINK NOTION - Attach a Notion page by adventure name/ID and Notion page name
+  adventure
+    .command("link-notion <nameOrId>")
+    .description("Link an adventure to a Notion page by adventure name/ID and Notion page name")
+    .option("--notion <pageName>", "Notion page name to search (defaults to adventure name)")
+    .action(async (nameOrId, options) => {
+      try {
+        const result = await linkEntityToNotion<Adventure>({
+          target: nameOrId,
+          notionName: options.notion,
+          entityLabel: "adventure",
+          findById: getAdventure,
+          searchByName: async (name) => {
+            const list = await searchAdventures({ search: name, limit: 10, page: 1 });
+            return list.adventures || list;
+          },
+          updateEntity: async (id, notionPageId) => updateAdventureNotionLink(id, notionPageId),
+          getId: (a) => (a as any).id,
+          getName: (a) => (a as any).name,
+          getNotionId: (a) => (a as any).notion_page_id,
+        });
+
+        if (result.updated) {
+          success(`Linked adventure \"${result.entity.name}\" to Notion page ${result.notionPage.id}`);
+        } else {
+          info(`Adventure \"${result.entity.name}\" is already linked to ${result.notionPage.id}`);
+        }
+      } catch (err) {
+        if (err instanceof Error && err.message === "Linking cancelled") {
+          info("Linking cancelled");
+          return;
+        }
+        error(err instanceof Error ? err.message : "Failed to link adventure to Notion");
         process.exit(1);
       }
     });

@@ -10,10 +10,13 @@ import {
   syncToNotion,
   syncFromNotion,
   getEntitySyncLogs,
+  searchFactions,
+  updateFactionNotionLink,
   type Faction
 } from "../lib/api.js";
 import { success, error, info } from "../lib/output.js";
 import * as fs from "fs";
+import { linkEntityToNotion } from "../lib/notionLinker.js";
 
 export function registerFactionCommands(program: Command): void {
   const faction = program
@@ -236,6 +239,40 @@ export function registerFactionCommands(program: Command): void {
         console.log(JSON.stringify(result, null, 2));
       } catch (err) {
         error(err instanceof Error ? err.message : "Failed to fetch Notion page");
+        process.exit(1);
+      }
+    });
+
+  // LINK NOTION - Attach a Notion page by faction name/ID and Notion page name
+  faction
+    .command("link-notion <nameOrId>")
+    .description("Link a faction to a Notion page by faction name/ID and Notion page name")
+    .option("--notion <pageName>", "Notion page name to search (defaults to faction name)")
+    .action(async (nameOrId, options) => {
+      try {
+        const result = await linkEntityToNotion<Faction>({
+          target: nameOrId,
+          notionName: options.notion,
+          entityLabel: "faction",
+          findById: getFaction,
+          searchByName: async (name) => searchFactions(name),
+          updateEntity: async (id, notionPageId) => updateFactionNotionLink(id, notionPageId),
+          getId: (f) => (f as any).id,
+          getName: (f) => (f as any).name,
+          getNotionId: (f) => (f as any).notion_page_id,
+        });
+
+        if (result.updated) {
+          success(`Linked faction \"${result.entity.name}\" to Notion page ${result.notionPage.id}`);
+        } else {
+          info(`Faction \"${result.entity.name}\" is already linked to ${result.notionPage.id}`);
+        }
+      } catch (err) {
+        if (err instanceof Error && err.message === "Linking cancelled") {
+          info("Linking cancelled");
+          return;
+        }
+        error(err instanceof Error ? err.message : "Failed to link faction to Notion");
         process.exit(1);
       }
     });

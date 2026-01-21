@@ -1,9 +1,10 @@
 import { Command } from "commander";
-import { listParties, getParty, createParty, updateParty, deleteParty, searchFaction, listPartyTemplates, applyPartyTemplate, assignCharacterToSlot, clearSlot, getEntityNotionPage, syncToNotion, syncFromNotion, getEntitySyncLogs } from "../lib/api.js";
+import { listParties, getParty, createParty, updateParty, deleteParty, searchFaction, listPartyTemplates, applyPartyTemplate, assignCharacterToSlot, clearSlot, getEntityNotionPage, syncToNotion, syncFromNotion, getEntitySyncLogs, searchParties, updatePartyNotionLink } from "../lib/api.js";
 import { getCurrentCampaignId } from "../lib/config.js";
 import { success, error, info } from "../lib/output.js";
 import * as fs from "fs";
 import type { Party } from "../types/index.js";
+import { linkEntityToNotion } from "../lib/notionLinker.js";
 
 export function registerPartyCommands(program: Command): void {
   const party = program
@@ -377,6 +378,43 @@ export function registerPartyCommands(program: Command): void {
         console.log(JSON.stringify(result, null, 2));
       } catch (err) {
         error(err instanceof Error ? err.message : "Failed to fetch Notion page");
+        process.exit(1);
+      }
+    });
+
+  // LINK NOTION - Attach a Notion page by party name/ID and Notion page name
+  party
+    .command("link-notion <nameOrId>")
+    .description("Link a party to a Notion page by party name/ID and Notion page name")
+    .option("--notion <pageName>", "Notion page name to search (defaults to party name)")
+    .action(async (nameOrId, options) => {
+      try {
+        const result = await linkEntityToNotion<Party>({
+          target: nameOrId,
+          notionName: options.notion,
+          entityLabel: "party",
+          findById: getParty,
+          searchByName: async (name) => {
+            const list = await searchParties({ search: name, limit: 10, page: 1 });
+            return list.parties || list;
+          },
+          updateEntity: async (id, notionPageId) => updatePartyNotionLink(id, notionPageId),
+          getId: (p) => (p as any).id,
+          getName: (p) => (p as any).name,
+          getNotionId: (p) => (p as any).notion_page_id,
+        });
+
+        if (result.updated) {
+          success(`Linked party \"${result.entity.name}\" to Notion page ${result.notionPage.id}`);
+        } else {
+          info(`Party \"${result.entity.name}\" is already linked to ${result.notionPage.id}`);
+        }
+      } catch (err) {
+        if (err instanceof Error && err.message === "Linking cancelled") {
+          info("Linking cancelled");
+          return;
+        }
+        error(err instanceof Error ? err.message : "Failed to link party to Notion");
         process.exit(1);
       }
     });

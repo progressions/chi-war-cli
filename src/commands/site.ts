@@ -9,10 +9,13 @@ import {
   syncToNotion,
   syncFromNotion,
   getEntitySyncLogs,
+  searchSites,
+  updateSiteNotionLink,
 } from "../lib/api.js";
 import { success, error, info } from "../lib/output.js";
 import * as fs from "fs";
 import type { Site, SiteAttunement } from "../types/index.js";
+import { linkEntityToNotion } from "../lib/notionLinker.js";
 
 export function registerSiteCommands(program: Command): void {
   const site = program
@@ -205,6 +208,45 @@ export function registerSiteCommands(program: Command): void {
         console.log(JSON.stringify(result, null, 2));
       } catch (err) {
         error(err instanceof Error ? err.message : "Failed to fetch Notion page");
+        process.exit(1);
+      }
+    });
+
+  // LINK NOTION - Attach a Notion page by site name/ID and Notion page name
+  site
+    .command("link-notion <nameOrId>")
+    .description("Link a site to a Notion page by site name/ID and Notion page name")
+    .option("--notion <pageName>", "Notion page name to search (defaults to site name)")
+    .action(async (nameOrId, options) => {
+      try {
+        const result = await linkEntityToNotion<Site>({
+          target: nameOrId,
+          notionName: options.notion,
+          entityLabel: "site",
+          findById: getSite,
+          searchByName: async (name) => {
+            const list = await searchSites({ search: name, limit: 10, page: 1 });
+            return list.sites || list;
+          },
+          updateEntity: async (id, notionPageId) => {
+            return updateSiteNotionLink(id, notionPageId);
+          },
+          getId: (s) => (s as any).id,
+          getName: (s) => (s as any).name,
+          getNotionId: (s) => (s as any).notion_page_id,
+        });
+
+        if (result.updated) {
+          success(`Linked site \"${result.entity.name}\" to Notion page ${result.notionPage.id}`);
+        } else {
+          info(`Site \"${result.entity.name}\" is already linked to ${result.notionPage.id}`);
+        }
+      } catch (err) {
+        if (err instanceof Error && err.message === "Linking cancelled") {
+          info("Linking cancelled");
+          return;
+        }
+        error(err instanceof Error ? err.message : "Failed to link site to Notion");
         process.exit(1);
       }
     });
