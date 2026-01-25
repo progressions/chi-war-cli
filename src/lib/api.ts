@@ -2597,6 +2597,31 @@ export async function searchNotionPages(name: string): Promise<NotionPage[]> {
   }
 }
 
+export async function fetchNotionBlocks(pageId: string): Promise<{ results: unknown[] }> {
+  const token = getToken();
+  if (!token) {
+    throw new Error("Not authenticated. Run 'chiwar login' first.");
+  }
+
+  const client = createClient(token);
+
+  try {
+    const response = await client.get(`/api/v2/notion/blocks`, {
+      params: { id: pageId },
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      if (error.response.status === 404) {
+        throw new Error("Notion not connected for this campaign");
+      }
+      const data = error.response.data as ApiError;
+      throw new Error(data.error || data.message || "Failed to fetch Notion blocks");
+    }
+    throw error;
+  }
+}
+
 // Notification API
 
 export interface SendNotificationParams {
